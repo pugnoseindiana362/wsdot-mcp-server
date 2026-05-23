@@ -96,7 +96,7 @@ export class TrafficApiService {
   async getMountainPasses(ctx: Context): Promise<MountainPass[]> {
     ctx.log.info('Fetching mountain pass conditions');
     const raw = await this.fetchJson<RawMountainPassResponse>(
-      'MountainPassConditionsREST.svc/GetMountainPassConditionsAsJson',
+      'MountainPassConditions/MountainPassConditionsREST.svc/GetMountainPassConditionsAsJson',
       ctx,
     );
     const passes = raw.GetMountainPassConditionsAsJsonResult ?? [];
@@ -143,7 +143,11 @@ export class TrafficApiService {
   }
 
   async searchAlerts(params: AlertSearchParams, ctx: Context): Promise<HighwayAlert[]> {
-    const hasFilter = params.stateRoute || params.region;
+    const hasFilter =
+      params.stateRoute ||
+      params.region ||
+      params.startMilepost != null ||
+      params.endMilepost != null;
     let raw: HighwayAlert[];
 
     if (hasFilter) {
@@ -153,13 +157,13 @@ export class TrafficApiService {
       if (params.startMilepost != null) qs.set('StartingMilepost', String(params.startMilepost));
       if (params.endMilepost != null) qs.set('EndingMilepost', String(params.endMilepost));
       const result = await this.fetchJson<RawAlertSearchResponse>(
-        `HighwayAlertsREST.svc/SearchAlertsAsJson?${qs.toString()}`,
+        `HighwayAlerts/HighwayAlertsREST.svc/SearchAlertsAsJson?${qs.toString()}`,
         ctx,
       );
       raw = (result.SearchAlertsResult ?? []).map(normalizeAlert);
     } else {
       const result = await this.fetchJson<RawAlertListResponse>(
-        'HighwayAlertsREST.svc/GetAlertsAsJson',
+        'HighwayAlerts/HighwayAlertsREST.svc/GetAlertsAsJson',
         ctx,
       );
       raw = (result.GetAlertsResult ?? []).map(normalizeAlert);
@@ -171,7 +175,7 @@ export class TrafficApiService {
   async getTravelTimes(ctx: Context): Promise<TravelTime[]> {
     ctx.log.info('Fetching travel times');
     const raw = await this.fetchJson<RawTravelTimesResponse>(
-      'TravelTimesREST.svc/GetTravelTimesAsJson',
+      'TravelTimes/TravelTimesREST.svc/GetTravelTimesAsJson',
       ctx,
     );
     const times = raw.GetTravelTimesAsJsonResult ?? [];
@@ -203,7 +207,7 @@ export class TrafficApiService {
   async getTollRates(ctx: Context): Promise<TollRate[]> {
     ctx.log.info('Fetching toll rates');
     const raw = await this.fetchJson<RawTollRatesResponse>(
-      'TollRatesREST.svc/GetTollRatesAsJson',
+      'TollRates/TollRatesREST.svc/GetTollRatesAsJson',
       ctx,
     );
     const rates = raw.GetTollRatesAsJsonResult ?? [];
@@ -225,7 +229,7 @@ export class TrafficApiService {
   async getBorderCrossings(ctx: Context): Promise<BorderCrossing[]> {
     ctx.log.info('Fetching border crossings');
     const raw = await this.fetchJson<RawBorderCrossingsResponse>(
-      'BorderCrossingsREST.svc/GetBorderCrossingsAsJson',
+      'BorderCrossings/BorderCrossingsREST.svc/GetBorderCrossingsAsJson',
       ctx,
     );
     const crossings = raw.GetBorderCrossingsAsJsonResult ?? [];
@@ -269,13 +273,13 @@ export class TrafficApiService {
       if (params.startMilepost != null) qs.set('StartingMilepost', String(params.startMilepost));
       if (params.endMilepost != null) qs.set('EndingMilepost', String(params.endMilepost));
       const result = await this.fetchJson<RawCameraSearchResponse>(
-        `HighwayCamerasREST.svc/SearchCamerasAsJson?${qs.toString()}`,
+        `HighwayCameras/HighwayCamerasREST.svc/SearchCamerasAsJson?${qs.toString()}`,
         ctx,
       );
       return (result.SearchCamerasAsJsonResult ?? []).map(normalizeCamera);
     } else {
       const result = await this.fetchJson<RawCameraListResponse>(
-        'HighwayCamerasREST.svc/GetCamerasAsJson',
+        'HighwayCameras/HighwayCamerasREST.svc/GetCamerasAsJson',
         ctx,
       );
       return (result.GetCamerasAsJsonResult ?? []).map(normalizeCamera);

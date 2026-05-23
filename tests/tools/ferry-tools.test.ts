@@ -21,11 +21,8 @@ const mockService = {
 vi.mock('@/services/ferry/ferry-service.js', () => ({
   getFerryApiService: () => mockService,
   FerryApiService: {
-    toFerryDate: (isoDate: string) => {
-      const d = new Date(isoDate);
-      return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${d.getUTCFullYear()}`;
-    },
-    todayFerryDate: () => '5/23/2026',
+    toFerryDate: (isoDate: string) => isoDate.trim().slice(0, 10),
+    todayFerryDate: () => '2026-05-23',
   },
 }));
 
@@ -129,7 +126,7 @@ describe('getFerryRoutes', () => {
     const result = await getFerryRoutes.handler(input, ctx);
     expect(result.routes).toHaveLength(1);
     expect(result.tripDate).toBe('2026-05-23');
-    expect(mockService.getRoutes).toHaveBeenCalledWith('5/23/2026', ctx);
+    expect(mockService.getRoutes).toHaveBeenCalledWith('2026-05-23', ctx);
   });
 
   it('returns empty routes list', async () => {
@@ -164,7 +161,7 @@ describe('getFerrySchedule', () => {
     routeName: 'Seattle/Bainbridge Island',
     departingTerminalName: 'Seattle',
     arrivingTerminalName: 'Bainbridge Island',
-    tripDate: '5/23/2026',
+    tripDate: '2026-05-23',
     sailings: [
       {
         departureTime: '6:00 AM',
@@ -230,7 +227,7 @@ describe('getFerrySchedule', () => {
     });
     const result = await getFerrySchedule.handler(input, ctx);
     expect(result.tripDate).toBe('2026-05-23');
-    expect(mockService.getSchedule).toHaveBeenCalledWith(7, 3, '5/23/2026', false, ctx);
+    expect(mockService.getSchedule).toHaveBeenCalledWith(7, 3, '2026-05-23', false, ctx);
   });
 
   it('formats schedule with sailings', () => {
@@ -450,8 +447,7 @@ describe('getFerryAlerts', () => {
     alertId: 201,
     alertDescription: 'Vessel Wenatchee out of service due to mechanical issues.',
     impactedRouteIds: [1, 2],
-    publishDate: '/Date(1700000000000-0800)/',
-    expireDate: '/Date(1700100000000-0800)/',
+    publishDate: '2023-11-14T22:13:20.000Z',
   };
 
   it('returns alerts from the service', async () => {

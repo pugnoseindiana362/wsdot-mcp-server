@@ -45,20 +45,29 @@ export interface FerryRoute {
 
 /** Raw sailing in a schedule response. */
 export interface RawSailing {
-  ArrivalTime?: string | null;
-  DepartureTime?: string | null;
+  /** Actual API field name (was ArrivalTime in older API). */
+  ArrivingTime?: string | null;
+  /** Actual API field name (was DepartureTime in older API). */
+  DepartingTime?: string | null;
   IsCancelled?: boolean | null;
   VesselID?: number | null;
   VesselName?: string | null;
 }
 
-/** Raw ferry schedule response. */
-export interface RawFerrySchedule {
-  AllDayBooked?: boolean | null;
+/** Terminal combo entry within a schedule response. */
+export interface RawTerminalCombo {
+  ArrivingTerminalID?: number | null;
   ArrivingTerminalName?: string | null;
+  DepartingTerminalID?: number | null;
   DepartingTerminalName?: string | null;
-  RouteName?: string | null;
   Times?: RawSailing[] | null;
+}
+
+/** Raw ferry schedule response — times are nested under TerminalCombos[0].Times. */
+export interface RawFerrySchedule {
+  ScheduleID?: number | null;
+  ScheduleName?: string | null;
+  TerminalCombos?: RawTerminalCombo[] | null;
 }
 
 /** Normalized sailing. */
@@ -120,16 +129,25 @@ export interface VesselLocation {
   vesselName?: string;
 }
 
-/** Raw departure space entry from upstream API. */
-export interface RawDepartureSpace {
-  ArrivingTerminalName?: string | null;
-  Departure?: string | null;
+/** Space availability for one arriving terminal within a departure. */
+export interface RawSpaceForArrivalTerminal {
   DriveUpSpaceCount?: number | null;
   DriveUpSpaceHexColor?: string | null;
-  IsCancelled?: boolean | null;
   MaxSpaceCount?: number | null;
   ReservableSpaceCount?: number | null;
   ReservableSpaceHexColor?: string | null;
+  TerminalID?: number | null;
+  TerminalName?: string | null;
+}
+
+/** Raw departure space entry from upstream API. */
+export interface RawDepartureSpace {
+  Departure?: string | null;
+  IsCancelled?: boolean | null;
+  MaxSpaceCount?: number | null;
+  /** Space counts are nested per arriving terminal. */
+  SpaceForArrivalTerminals?: RawSpaceForArrivalTerminal[] | null;
+  VesselID?: number | null;
   VesselName?: string | null;
 }
 
@@ -161,18 +179,23 @@ export interface TerminalSailingSpace {
 
 /** Raw ferry alert from upstream API. */
 export interface RawFerryAlert {
-  AlertDescription?: string | null;
-  AlertID?: number | null;
-  ExpireDate?: string | null;
-  ImpactedRouteIds?: number[] | null;
+  /** Route IDs affected by this alert (was ImpactedRouteIds in older API). */
+  AffectedRouteIDs?: number[] | null;
+  /** Fallback title when RouteAlertText is absent. */
+  AlertFullTitle?: string | null;
+  AlertType?: string | null;
+  /** Unique alert ID (was AlertID in older API). */
+  BulletinID?: number | null;
+  /** WCF date string — decoded to ISO 8601 during normalization. */
   PublishDate?: string | null;
+  /** Plain-text description (preferred over BulletinText which contains HTML). */
+  RouteAlertText?: string | null;
 }
 
 /** Normalized ferry alert. */
 export interface FerryAlert {
   alertDescription?: string;
   alertId?: number;
-  expireDate?: string;
   impactedRouteIds: number[];
   publishDate?: string;
 }

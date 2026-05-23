@@ -30,8 +30,7 @@ export const getFerryAlerts = tool('wsdot_get_ferry_alerts', {
               .describe(
                 'Route IDs affected by this alert. Cross-reference with wsdot_get_ferry_routes to get route names.',
               ),
-            publishDate: z.string().optional().describe('When the alert was published.'),
-            expireDate: z.string().optional().describe('When the alert expires.'),
+            publishDate: z.string().optional().describe('When the alert was published (ISO 8601).'),
           })
           .describe('A WSF ferry service alert or disruption.'),
       )
@@ -71,7 +70,6 @@ export const getFerryAlerts = tool('wsdot_get_ferry_alerts', {
         );
       }
       if (a.publishDate) lines.push(`**Published:** ${a.publishDate}`);
-      if (a.expireDate) lines.push(`**Expires:** ${a.expireDate}`);
       lines.push('');
     }
     return [{ type: 'text', text: lines.join('\n') }];

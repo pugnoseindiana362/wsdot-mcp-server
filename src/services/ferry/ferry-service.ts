@@ -89,7 +89,7 @@ export class FerryApiService {
     );
   }
 
-  /** Convert ISO 8601 or YYYY-MM-DD date string to M/D/YYYY format used by ferry API paths. */
+  /** Validate and normalize an ISO 8601 date string for use in ferry API paths. */
   static toFerryDate(isoDate: string): string {
     const d = new Date(isoDate);
     if (Number.isNaN(d.getTime())) {
@@ -97,13 +97,13 @@ export class FerryApiService {
         `Invalid date: "${isoDate}". Expected ISO 8601 format (e.g. 2026-05-23).`,
       );
     }
-    return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${d.getUTCFullYear()}`;
+    // Return YYYY-MM-DD — the WSF Schedule API requires ISO 8601
+    return isoDate.trim().slice(0, 10);
   }
 
-  /** Return today's date in M/D/YYYY format. */
+  /** Return today's date in YYYY-MM-DD format. */
   static todayFerryDate(): string {
-    const d = new Date();
-    return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${d.getUTCFullYear()}`;
+    return new Date().toISOString().slice(0, 10);
   }
 
   async getTerminals(ctx: Context): Promise<FerryTerminal[]> {
@@ -157,16 +157,19 @@ export class FerryApiService {
     });
     const raw = await this.fetchJson<RawFerrySchedule>(path, ctx);
 
+    // Schedule response nests sailings in TerminalCombos[0].Times
+    const combo = raw.TerminalCombos?.[0];
     return {
-      ...(raw.RouteName != null && { routeName: raw.RouteName }),
-      ...(raw.DepartingTerminalName != null && {
-        departingTerminalName: raw.DepartingTerminalName,
+      ...(combo?.DepartingTerminalName != null && {
+        departingTerminalName: combo.DepartingTerminalName,
       }),
-      ...(raw.ArrivingTerminalName != null && { arrivingTerminalName: raw.ArrivingTerminalName }),
+      ...(combo?.ArrivingTerminalName != null && {
+        arrivingTerminalName: combo.ArrivingTerminalName,
+      }),
       tripDate,
-      sailings: (raw.Times ?? []).map((s) => ({
-        ...(s.DepartureTime != null && { departureTime: s.DepartureTime }),
-        ...(s.ArrivalTime != null && { arrivalTime: s.ArrivalTime }),
+      sailings: (combo?.Times ?? []).map((s) => ({
+        ...(s.DepartingTime != null && { departureTime: decodeWcfDate(s.DepartingTime) }),
+        ...(s.ArrivingTime != null && { arrivalTime: decodeWcfDate(s.ArrivingTime) }),
         ...(typeof s.IsCancelled === 'boolean' && { isCancelled: s.IsCancelled }),
         ...(s.VesselName != null && { vesselName: s.VesselName }),
       })),
@@ -189,11 +192,13 @@ export class FerryApiService {
       ...(v.Longitude != null && { longitude: v.Longitude }),
       ...(v.Speed != null && { speed: v.Speed }),
       ...(v.Heading != null && { heading: v.Heading }),
-      ...(v.LeftDock != null && { leftDock: v.LeftDock }),
-      ...(v.Eta != null && { eta: v.Eta }),
-      ...(v.ScheduledDeparture != null && { scheduledDeparture: v.ScheduledDeparture }),
+      ...(v.LeftDock != null && { leftDock: decodeWcfDate(v.LeftDock) }),
+      ...(v.Eta != null && { eta: decodeWcfDate(v.Eta) }),
+      ...(v.ScheduledDeparture != null && {
+        scheduledDeparture: decodeWcfDate(v.ScheduledDeparture),
+      }),
       opRouteAbbrev: v.OpRouteAbbrev ?? [],
-      ...(v.TimeStamp != null && { timestamp: v.TimeStamp }),
+      ...(v.TimeStamp != null && { timestamp: decodeWcfDate(v.TimeStamp) }),
     }));
   }
 
@@ -206,16 +211,31 @@ export class FerryApiService {
     return (raw ?? []).map((t) => ({
       ...(t.TerminalID != null && { terminalId: t.TerminalID }),
       ...(t.TerminalName != null && { terminalName: t.TerminalName }),
-      departingSpaces: (t.DepartingSpaces ?? []).map((s) => ({
-        ...(s.Departure != null && { departure: s.Departure }),
-        ...(typeof s.IsCancelled === 'boolean' && { isCancelled: s.IsCancelled }),
-        ...(s.VesselName != null && { vesselName: s.VesselName }),
-        ...(s.ArrivingTerminalName != null && { arrivingTerminalName: s.ArrivingTerminalName }),
-        ...(s.DriveUpSpaceCount != null && { driveUpSpaceCount: s.DriveUpSpaceCount }),
-        ...(s.ReservableSpaceCount != null && { reservableSpaceCount: s.ReservableSpaceCount }),
-        ...(s.MaxSpaceCount != null && { maxSpaceCount: s.MaxSpaceCount }),
-        ...(s.DriveUpSpaceHexColor != null && { driveUpSpaceHexColor: s.DriveUpSpaceHexColor }),
-      })),
+      departingSpaces: (t.DepartingSpaces ?? []).flatMap((s) => {
+        // Space counts are nested per arriving terminal; expand into one entry per arrival terminal
+        const arrivalTerminals = s.SpaceForArrivalTerminals ?? [];
+        if (arrivalTerminals.length === 0) {
+          // Departure with no arrival terminal breakdowns — emit a row with just the vessel/departure info
+          return [
+            {
+              ...(s.Departure != null && { departure: decodeWcfDate(s.Departure) }),
+              ...(typeof s.IsCancelled === 'boolean' && { isCancelled: s.IsCancelled }),
+              ...(s.VesselName != null && { vesselName: s.VesselName }),
+              ...(s.MaxSpaceCount != null && { maxSpaceCount: s.MaxSpaceCount }),
+            },
+          ];
+        }
+        return arrivalTerminals.map((a) => ({
+          ...(s.Departure != null && { departure: decodeWcfDate(s.Departure) }),
+          ...(typeof s.IsCancelled === 'boolean' && { isCancelled: s.IsCancelled }),
+          ...(s.VesselName != null && { vesselName: s.VesselName }),
+          ...(a.TerminalName != null && { arrivingTerminalName: a.TerminalName }),
+          ...(a.DriveUpSpaceCount != null && { driveUpSpaceCount: a.DriveUpSpaceCount }),
+          ...(a.ReservableSpaceCount != null && { reservableSpaceCount: a.ReservableSpaceCount }),
+          ...(s.MaxSpaceCount != null && { maxSpaceCount: s.MaxSpaceCount }),
+          ...(a.DriveUpSpaceHexColor != null && { driveUpSpaceHexColor: a.DriveUpSpaceHexColor }),
+        }));
+      }),
     }));
   }
 
@@ -223,13 +243,26 @@ export class FerryApiService {
     ctx.log.info('Fetching ferry alerts');
     const raw = await this.fetchJson<RawFerryAlert[]>('Schedule/rest/alerts', ctx);
     return (raw ?? []).map((a) => ({
-      ...(a.AlertID != null && { alertId: a.AlertID }),
-      ...(a.AlertDescription != null && { alertDescription: a.AlertDescription }),
-      impactedRouteIds: a.ImpactedRouteIds ?? [],
-      ...(a.PublishDate != null && { publishDate: a.PublishDate }),
-      ...(a.ExpireDate != null && { expireDate: a.ExpireDate }),
+      ...(a.BulletinID != null && { alertId: a.BulletinID }),
+      // Prefer plain-text RouteAlertText; fall back to AlertFullTitle when absent
+      ...(a.RouteAlertText != null
+        ? { alertDescription: a.RouteAlertText }
+        : a.AlertFullTitle != null
+          ? { alertDescription: a.AlertFullTitle }
+          : {}),
+      impactedRouteIds: a.AffectedRouteIDs ?? [],
+      ...(a.PublishDate != null && { publishDate: decodeWcfDate(a.PublishDate) }),
     }));
   }
+}
+
+// --- Utilities ---
+
+/** Decode a WCF JSON date string (`/Date(ms±offset)/`) to ISO 8601, or return input unchanged. */
+function decodeWcfDate(value: string): string {
+  const match = /^\/Date\((-?\d+)([+-]\d{4})?\)\/$/.exec(value);
+  if (!match) return value;
+  return new Date(Number(match[1])).toISOString();
 }
 
 // --- Init/accessor pattern ---
