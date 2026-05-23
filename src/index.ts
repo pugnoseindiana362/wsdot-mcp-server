@@ -5,17 +5,49 @@
  */
 
 import { createApp } from '@cyanheads/mcp-ts-core';
-import { echoTool } from './mcp-server/tools/definitions/echo.tool.js';
-import { echoAppTool } from './mcp-server/tools/definitions/echo-app.app-tool.js';
-import { echoResource } from './mcp-server/resources/definitions/echo.resource.js';
-import { echoAppUiResource } from './mcp-server/resources/definitions/echo-app-ui.app-resource.js';
-import { echoPrompt } from './mcp-server/prompts/definitions/echo.prompt.js';
+import {
+  getBorderWaits,
+  getFerryAlerts,
+  getFerryRoutes,
+  getFerrySchedule,
+  getFerryTerminals,
+  getMountainPasses,
+  getTerminalSpace,
+  getTollRates,
+  getTravelTimes,
+  getVesselLocations,
+  searchAlerts,
+  searchCameras,
+} from './mcp-server/tools/definitions/index.js';
+import { initFerryApiService } from './services/ferry/ferry-service.js';
+import { initTrafficApiService } from './services/traffic/traffic-service.js';
 
 await createApp({
-  tools: [echoTool, echoAppTool],
-  resources: [echoResource, echoAppUiResource],
-  prompts: [echoPrompt],
-  // instructions: 'Server-level orientation forwarded to the model on every initialize.\n' +
-  //   '- Use shortcut `X` for the most common case\n' +
-  //   '- Tools require auth via the `inventory:read` scope',
+  tools: [
+    getMountainPasses,
+    searchAlerts,
+    getTravelTimes,
+    getTollRates,
+    getBorderWaits,
+    searchCameras,
+    getFerryTerminals,
+    getFerryRoutes,
+    getFerrySchedule,
+    getVesselLocations,
+    getTerminalSpace,
+    getFerryAlerts,
+  ],
+  resources: [],
+  prompts: [],
+  instructions:
+    'WSDOT Traveler Information server for Washington State. ' +
+    'Traffic tools (mountain passes, alerts, travel times, toll rates, border waits, cameras) ' +
+    'use the WSDOT Traffic API. Ferry tools use the WSF Ferry API. ' +
+    'For ferry schedule and space lookups, first call wsdot_get_ferry_terminals to resolve ' +
+    'terminal names to numeric IDs. Ferry route IDs from wsdot_get_ferry_routes correspond ' +
+    'to impactedRouteIds in wsdot_get_ferry_alerts.',
+  setup(core) {
+    initTrafficApiService(core.config, core.storage);
+    initFerryApiService(core.config, core.storage);
+  },
 });

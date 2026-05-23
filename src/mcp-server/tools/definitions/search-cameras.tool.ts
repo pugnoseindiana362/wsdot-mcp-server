@@ -1,0 +1,134 @@
+/**
+ * @fileoverview Tool to search highway camera locations and metadata from the WSDOT Traffic API.
+ * @module mcp-server/tools/definitions/search-cameras.tool
+ */
+
+import { tool, z } from '@cyanheads/mcp-ts-core';
+import { JsonRpcErrorCode } from '@cyanheads/mcp-ts-core/errors';
+import { getTrafficApiService } from '@/services/traffic/traffic-service.js';
+
+const MAX_INLINE_CAMERAS = 20;
+
+export const searchCameras = tool('wsdot_search_cameras', {
+  title: 'Search Highway Cameras',
+  description:
+    'Returns WSDOT highway camera locations, descriptions, and image URLs. ' +
+    'Camera images are copyright WSDOT — only metadata and image URLs are returned, not image bytes. ' +
+    'Filter by state route (e.g. "090" for I-90), WSDOT region, or milepost range. ' +
+    'Omit all filters to list all cameras statewide (potentially hundreds).',
+  annotations: { readOnlyHint: true },
+  input: z.object({
+    stateRoute: z
+      .string()
+      .optional()
+      .describe('Zero-padded 3-digit state route number (e.g. "005" for I-5, "090" for I-90).'),
+    region: z
+      .string()
+      .optional()
+      .describe(
+        'WSDOT region name: Northwest, Olympic, Southwest, South Central, North Central, or Eastern.',
+      ),
+    startMilepost: z.number().optional().describe('Start of milepost range to filter cameras.'),
+    endMilepost: z.number().optional().describe('End of milepost range to filter cameras.'),
+  }),
+  output: z.object({
+    cameras: z
+      .array(
+        z
+          .object({
+            cameraId: z.number().optional().describe('Unique camera identifier.'),
+            title: z.string().optional().describe('Camera title or location description.'),
+            description: z.string().optional().describe('Additional description.'),
+            imageUrl: z
+              .string()
+              .optional()
+              .describe('URL of the WSDOT-hosted camera image (JPEG). WSDOT copyright applies.'),
+            imageWidth: z.number().optional().describe('Image width in pixels.'),
+            imageHeight: z.number().optional().describe('Image height in pixels.'),
+            roadName: z.string().optional().describe('Road the camera monitors.'),
+            direction: z.string().optional().describe('Traffic direction monitored.'),
+            milePost: z.number().optional().describe('Milepost location of the camera.'),
+            region: z.string().optional().describe('WSDOT region.'),
+            latitude: z.number().optional().describe('Camera latitude.'),
+            longitude: z.number().optional().describe('Camera longitude.'),
+          })
+          .describe('Camera metadata and image URL for one WSDOT highway camera.'),
+      )
+      .describe('Camera metadata and image URLs. Images are copyright WSDOT.'),
+    totalCount: z.number().describe('Total number of cameras returned.'),
+    note: z
+      .string()
+      .optional()
+      .describe('Informational note about result truncation or copyright.'),
+  }),
+
+  errors: [
+    {
+      reason: 'api_unavailable',
+      code: JsonRpcErrorCode.ServiceUnavailable,
+      when: 'WSDOT Traffic API is unreachable or returns a non-2xx response after retries.',
+      retryable: true,
+      recovery:
+        'Retry in 30 seconds. If the issue persists, check wsdot.wa.gov for service status.',
+    },
+  ],
+
+  async handler(input, ctx) {
+    const stateRoute = input.stateRoute?.trim() || undefined;
+    const region = input.region?.trim() || undefined;
+    const cameras = await getTrafficApiService().searchCameras(
+      {
+        ...(stateRoute ? { stateRoute } : {}),
+        ...(region ? { region } : {}),
+        ...(input.startMilepost != null ? { startMilepost: input.startMilepost } : {}),
+        ...(input.endMilepost != null ? { endMilepost: input.endMilepost } : {}),
+      },
+      ctx,
+    );
+
+    const note =
+      cameras.length > MAX_INLINE_CAMERAS
+        ? `Showing first ${MAX_INLINE_CAMERAS} of ${cameras.length} cameras. Add filters (stateRoute, region, or mileposts) to narrow results. Camera images are copyright WSDOT.`
+        : 'Camera images are copyright WSDOT. Follow image URLs to view live feeds.';
+
+    ctx.log.info('Cameras fetched', { count: cameras.length });
+    return {
+      cameras,
+      totalCount: cameras.length,
+      ...(note ? { note } : {}),
+    };
+  },
+
+  format: (result) => {
+    const lines: string[] = [];
+    if (result.note) lines.push(`> ${result.note}\n`);
+    lines.push(`## Highway Cameras (${result.totalCount} total)\n`);
+    const display = result.cameras.slice(0, MAX_INLINE_CAMERAS);
+    for (const c of display) {
+      lines.push(`### ${c.title ?? `Camera ${c.cameraId ?? ''}`}`);
+      if (c.description) lines.push(c.description);
+      if (c.roadName) {
+        const loc = [c.roadName, c.direction, c.milePost != null ? `MP ${c.milePost}` : undefined]
+          .filter(Boolean)
+          .join(' ');
+        lines.push(`**Location:** ${loc}`);
+      }
+      if (c.region) lines.push(`**Region:** ${c.region}`);
+      if (c.imageUrl) lines.push(`**Image:** ${c.imageUrl}`);
+      if (c.imageWidth != null && c.imageHeight != null) {
+        lines.push(`**Size:** ${c.imageWidth}×${c.imageHeight}px`);
+      }
+      if (c.latitude != null && c.longitude != null) {
+        lines.push(`**Coords:** ${c.latitude}, ${c.longitude}`);
+      }
+      if (c.cameraId != null) lines.push(`**ID:** ${c.cameraId}`);
+      lines.push('');
+    }
+    if (result.cameras.length > MAX_INLINE_CAMERAS) {
+      lines.push(
+        `_... ${result.cameras.length - MAX_INLINE_CAMERAS} more cameras in structuredContent_`,
+      );
+    }
+    return [{ type: 'text', text: lines.join('\n') }];
+  },
+});
