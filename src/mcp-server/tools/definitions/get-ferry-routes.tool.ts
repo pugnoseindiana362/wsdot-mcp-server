@@ -76,20 +76,13 @@ export const getFerryRoutes = tool('wsdot_get_ferry_routes', {
   ],
 
   async handler(input, ctx) {
-    let ferryDate: string;
-    let isoDate: string;
+    const tripDate = input.tripDate?.trim()
+      ? FerryApiService.toFerryDate(input.tripDate.trim())
+      : FerryApiService.todayFerryDate();
 
-    if (input.tripDate?.trim()) {
-      ferryDate = FerryApiService.toFerryDate(input.tripDate.trim());
-      isoDate = input.tripDate.trim();
-    } else {
-      ferryDate = FerryApiService.todayFerryDate();
-      isoDate = new Date().toISOString().slice(0, 10);
-    }
-
-    const routes = await getFerryApiService().getRoutes(ferryDate, ctx);
-    ctx.log.info('Ferry routes fetched', { tripDate: ferryDate, count: routes.length });
-    return { routes, tripDate: isoDate, totalCount: routes.length };
+    const routes = await getFerryApiService().getRoutes(tripDate, ctx);
+    ctx.log.info('Ferry routes fetched', { tripDate, count: routes.length });
+    return { routes, tripDate, totalCount: routes.length };
   },
 
   format: (result) => {

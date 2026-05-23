@@ -82,7 +82,6 @@ export interface Sailing {
 export interface FerrySchedule {
   arrivingTerminalName?: string;
   departingTerminalName?: string;
-  routeName?: string;
   sailings: Sailing[];
   tripDate: string;
 }

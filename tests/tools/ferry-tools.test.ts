@@ -158,7 +158,6 @@ describe('getFerryRoutes', () => {
 
 describe('getFerrySchedule', () => {
   const scheduleFixture = {
-    routeName: 'Seattle/Bainbridge Island',
     departingTerminalName: 'Seattle',
     arrivingTerminalName: 'Bainbridge Island',
     tripDate: '2026-05-23',
@@ -188,7 +187,6 @@ describe('getFerrySchedule', () => {
     const result = await getFerrySchedule.handler(input, ctx);
     expect(result.sailings).toHaveLength(2);
     expect(result.totalSailings).toBe(2);
-    expect(result.routeName).toBe('Seattle/Bainbridge Island');
     expect(result.departingTerminalName).toBe('Seattle');
     expect(result.arrivingTerminalName).toBe('Bainbridge Island');
   });
@@ -232,7 +230,6 @@ describe('getFerrySchedule', () => {
 
   it('formats schedule with sailings', () => {
     const output = {
-      routeName: 'Seattle/Bainbridge Island',
       departingTerminalName: 'Seattle',
       arrivingTerminalName: 'Bainbridge Island',
       tripDate: '2026-05-23',
@@ -250,7 +247,7 @@ describe('getFerrySchedule', () => {
     };
     const blocks = getFerrySchedule.format!(output);
     const text = (blocks[0] as { text: string }).text;
-    expect(text).toContain('Seattle/Bainbridge Island');
+    expect(text).toContain('Seattle → Bainbridge Island');
     expect(text).toContain('2026-05-23');
     expect(text).toContain('2'); // totalSailings
     expect(text).toContain('6:00 AM');
@@ -260,7 +257,6 @@ describe('getFerrySchedule', () => {
 
   it('formats empty sailings list', () => {
     const output = {
-      routeName: 'Test Route',
       tripDate: '2026-05-23',
       remainingOnly: false,
       sailings: [],

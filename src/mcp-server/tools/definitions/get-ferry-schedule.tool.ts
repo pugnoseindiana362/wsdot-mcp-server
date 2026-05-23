@@ -34,7 +34,6 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
       ),
   }),
   output: z.object({
-    routeName: z.string().optional().describe('Name of the ferry route.'),
     departingTerminalName: z.string().optional().describe('Departing terminal name.'),
     arrivingTerminalName: z.string().optional().describe('Arriving terminal name.'),
     tripDate: z.string().describe('Date of the schedule (ISO 8601).'),
@@ -79,22 +78,15 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
   ],
 
   async handler(input, ctx) {
-    let ferryDate: string;
-    let isoDate: string;
-
-    if (input.tripDate?.trim()) {
-      ferryDate = FerryApiService.toFerryDate(input.tripDate.trim());
-      isoDate = input.tripDate.trim();
-    } else {
-      ferryDate = FerryApiService.todayFerryDate();
-      isoDate = new Date().toISOString().slice(0, 10);
-    }
-
+    const tripDate = input.tripDate?.trim()
+      ? FerryApiService.toFerryDate(input.tripDate.trim())
+      : FerryApiService.todayFerryDate();
     const remainingOnly = input.remainingOnly ?? false;
+
     const schedule = await getFerryApiService().getSchedule(
       input.departingTerminalId,
       input.arrivingTerminalId,
-      ferryDate,
+      tripDate,
       remainingOnly,
       ctx,
     );
@@ -102,15 +94,14 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
     ctx.log.info('Ferry schedule fetched', {
       departingTerminalId: input.departingTerminalId,
       arrivingTerminalId: input.arrivingTerminalId,
-      tripDate: ferryDate,
+      tripDate,
       sailingsCount: schedule.sailings.length,
     });
 
     return {
-      routeName: schedule.routeName,
       departingTerminalName: schedule.departingTerminalName,
       arrivingTerminalName: schedule.arrivingTerminalName,
-      tripDate: isoDate,
+      tripDate,
       remainingOnly,
       sailings: schedule.sailings,
       totalSailings: schedule.sailings.length,
@@ -118,7 +109,10 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
   },
 
   format: (result) => {
-    const route = result.routeName ?? 'Unknown Route';
+    const route =
+      result.departingTerminalName && result.arrivingTerminalName
+        ? `${result.departingTerminalName} → ${result.arrivingTerminalName}`
+        : 'Ferry Schedule';
     const remainingNote = result.remainingOnly ? ' (remaining today)' : '';
     const lines: string[] = [
       `## Ferry Schedule — ${route}`,

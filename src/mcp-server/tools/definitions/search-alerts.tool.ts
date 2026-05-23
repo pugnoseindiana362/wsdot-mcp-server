@@ -96,10 +96,10 @@ export const searchAlerts = tool('wsdot_search_alerts', {
     const region = input.region?.trim() || undefined;
     const alerts = await getTrafficApiService().searchAlerts(
       {
-        ...(stateRoute ? { stateRoute } : {}),
-        ...(region ? { region } : {}),
-        ...(input.startMilepost != null ? { startMilepost: input.startMilepost } : {}),
-        ...(input.endMilepost != null ? { endMilepost: input.endMilepost } : {}),
+        ...(stateRoute && { stateRoute }),
+        ...(region && { region }),
+        ...(input.startMilepost != null && { startMilepost: input.startMilepost }),
+        ...(input.endMilepost != null && { endMilepost: input.endMilepost }),
       },
       ctx,
     );

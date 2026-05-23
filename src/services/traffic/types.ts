@@ -172,7 +172,6 @@ export interface RawTollRate {
   TollCondition?: number | null;
   TollRate?: number | null;
   TripName?: string | null;
-  [key: string]: unknown;
 }
 
 /** Raw toll rates response. */

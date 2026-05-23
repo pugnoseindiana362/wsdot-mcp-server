@@ -78,10 +78,10 @@ export const searchCameras = tool('wsdot_search_cameras', {
     const region = input.region?.trim() || undefined;
     const cameras = await getTrafficApiService().searchCameras(
       {
-        ...(stateRoute ? { stateRoute } : {}),
-        ...(region ? { region } : {}),
-        ...(input.startMilepost != null ? { startMilepost: input.startMilepost } : {}),
-        ...(input.endMilepost != null ? { endMilepost: input.endMilepost } : {}),
+        ...(stateRoute && { stateRoute }),
+        ...(region && { region }),
+        ...(input.startMilepost != null && { startMilepost: input.startMilepost }),
+        ...(input.endMilepost != null && { endMilepost: input.endMilepost }),
       },
       ctx,
     );
@@ -92,11 +92,7 @@ export const searchCameras = tool('wsdot_search_cameras', {
         : 'Camera images are copyright WSDOT. Follow image URLs to view live feeds.';
 
     ctx.log.info('Cameras fetched', { count: cameras.length });
-    return {
-      cameras,
-      totalCount: cameras.length,
-      ...(note ? { note } : {}),
-    };
+    return { cameras, totalCount: cameras.length, note };
   },
 
   format: (result) => {

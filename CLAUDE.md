@@ -11,38 +11,6 @@
 
 ---
 
-## First Session
-
-This project was just scaffolded with `bunx @cyanheads/mcp-ts-core init`. The framework, skills, and example definitions are in place — the domain isn't. The user's first messages will set direction; wait for them before proceeding.
-
-> **Remove this section** from CLAUDE.md / AGENTS.md after completing these steps. The skills and conventions below remain — this block is one-time onboarding only.
-
-1. **Get your bearings.** Take stock of the project tree, the skills in `skills/`, and the tools/MCP servers available. Light tool use is fine for context-building — you're mapping the territory, not committing yet.
-2. **Read the framework docs** — `node_modules/@cyanheads/mcp-ts-core/CLAUDE.md` (builders, Context, errors, exports, conventions)
-3. **Run the `setup` skill** — read `skills/setup/SKILL.md` and follow its checklist (project orientation, agent protocol file selection, echo definition cleanup, skill sync)
-4. **Design the server** — read `skills/design-mcp-server/SKILL.md` and work through it with the user to map the domain into tools, resources, and services before scaffolding
-
----
-
-## What's Next?
-
-When the user asks what's next or needs direction, suggest options based on the current project state. Common next steps:
-
-1. **Re-run the `setup` skill** — ensures CLAUDE.md, skills, structure, and metadata are populated and up to date with the current codebase
-2. **Run the `design-mcp-server` skill** — if the tool/resource surface hasn't been mapped yet, work through domain design
-3. **Add tools/resources/prompts** — scaffold new definitions using the `add-tool`, `add-app-tool`, `add-resource`, `add-prompt` skills
-4. **Add services** — scaffold domain service integrations using the `add-service` skill
-5. **Add tests** — scaffold tests for existing definitions using the `add-test` skill
-6. **Field-test definitions** — exercise tools/resources/prompts with real inputs using the `field-test` skill, get a report of issues and pain points
-7. **Run `devcheck`** — lint, format, typecheck, and security audit
-8. **Run the `security-pass` skill** — audit handlers for MCP-specific security gaps: output injection, scope blast radius, input sinks, tenant isolation
-9. **Run the `polish-docs-meta` skill** — finalize README, CHANGELOG, metadata, and agent protocol for shipping
-10. **Run the `maintenance` skill** — investigate changelogs, adopt upstream changes, and sync skills after `bun update --latest`
-
-Tailor suggestions to what's actually missing or stale — don't recite the full list every time.
-
----
-
 ## Core Rules
 
 - **Logic throws, framework catches.** Tool/resource handlers are pure — throw on failure, no `try/catch`. Plain `Error` is fine; the framework catches, classifies, and formats. Use error factories (`notFound()`, `validationError()`, etc.) when the error code matters.
@@ -59,26 +27,24 @@ Tailor suggestions to what's actually missing or stale — don't recite the full
 
 ```ts
 import { tool, z } from '@cyanheads/mcp-ts-core';
+import { getTrafficApiService } from '@/services/traffic/traffic-service.js';
 
-export const searchItems = tool('search_items', {
-  description: 'Search inventory items by query.',
+export const getMountainPasses = tool('wsdot_get_mountain_passes', {
+  description: 'Returns current road conditions for all Washington State mountain passes.',
   annotations: { readOnlyHint: true },
-  input: z.object({
-    query: z.string().describe('Search terms'),
-    limit: z.number().default(10).describe('Max results'),
-  }),
+  input: z.object({}),
   output: z.object({
-    items: z.array(z.object({
-      id: z.string().describe('Item ID'),
-      name: z.string().describe('Item name'),
-    })).describe('Matching items'),
+    passes: z.array(z.object({
+      passName: z.string().optional().describe('Name of the mountain pass.'),
+      roadCondition: z.string().optional().describe('Current road condition.'),
+    })).describe('Current conditions for all WA mountain passes.'),
   }),
-  auth: ['inventory:read'],
 
   async handler(input, ctx) {
-    const items = await findItems(input.query, input.limit);
-    ctx.log.info('Search completed', { query: input.query, count: items.length });
-    return { items };
+    const svc = getTrafficApiService();
+    const passes = await svc.getMountainPassConditions();
+    ctx.log.info('Mountain passes fetched', { count: passes.length });
+    return { passes };
   },
 
   // format() populates content[] — the markdown twin of structuredContent.
@@ -87,43 +53,8 @@ export const searchItems = tool('search_items', {
   // Enforced at lint time: every field in `output` must appear in the rendered text.
   format: (result) => [{
     type: 'text',
-    text: result.items.map(i => `**${i.id}**: ${i.name}`).join('\n'),
+    text: result.passes.map(p => `**${p.passName}**: ${p.roadCondition}`).join('\n'),
   }],
-});
-```
-
-### Resource
-
-```ts
-import { resource, z } from '@cyanheads/mcp-ts-core';
-import { notFound } from '@cyanheads/mcp-ts-core/errors';
-
-export const itemData = resource('inventory://{itemId}', {
-  description: 'Fetch an inventory item by ID.',
-  params: z.object({ itemId: z.string().describe('Item identifier') }),
-  auth: ['inventory:read'],
-  async handler(params, ctx) {
-    const item = await ctx.state.get(`item:${params.itemId}`);
-    if (!item) throw notFound(`Item ${params.itemId} not found`, { itemId: params.itemId });
-    return item;
-  },
-});
-```
-
-### Prompt
-
-```ts
-import { prompt, z } from '@cyanheads/mcp-ts-core';
-
-export const reviewCode = prompt('review_code', {
-  description: 'Review code for issues and best practices.',
-  args: z.object({
-    code: z.string().describe('Code to review'),
-    language: z.string().optional().describe('Programming language'),
-  }),
-  generate: (args) => [
-    { role: 'user', content: { type: 'text', text: `Review this ${args.language ?? ''} code:\n${args.code}` } },
-  ],
 });
 ```
 
@@ -135,21 +66,19 @@ import { z } from '@cyanheads/mcp-ts-core';
 import { parseEnvConfig } from '@cyanheads/mcp-ts-core/config';
 
 const ServerConfigSchema = z.object({
-  apiKey: z.string().describe('External API key'),
-  maxResults: z.coerce.number().default(100),
+  accessCode: z.string().describe('WSDOT Traveler API access code.'),
 });
 
 let _config: z.infer<typeof ServerConfigSchema> | undefined;
 export function getServerConfig() {
   _config ??= parseEnvConfig(ServerConfigSchema, {
-    apiKey: 'MY_API_KEY',
-    maxResults: 'MY_MAX_RESULTS',
+    accessCode: 'WSDOT_ACCESS_CODE',
   });
   return _config;
 }
 ```
 
-`parseEnvConfig` maps Zod schema paths → env var names so errors name the variable (`MY_API_KEY`) not the path (`apiKey`). Throws `ConfigurationError`, which the framework prints as a clean startup banner.
+`parseEnvConfig` maps Zod schema paths → env var names so errors name the variable (`WSDOT_ACCESS_CODE`) not the path (`accessCode`). Throws `ConfigurationError`, which the framework prints as a clean startup banner.
 
 ---
 
@@ -216,20 +145,30 @@ See framework CLAUDE.md and the `api-errors` skill for the full auto-classificat
 
 ```text
 src/
-  index.ts                              # createApp() entry point
+  index.ts                              # createApp() entry point — 12 tools, 2 services
   config/
-    server-config.ts                    # Server-specific env vars (Zod schema)
+    server-config.ts                    # WSDOT_ACCESS_CODE env var (Zod schema)
   services/
-    [domain]/
-      [domain]-service.ts               # Domain service (init/accessor pattern)
-      types.ts                          # Domain types
+    traffic/
+      traffic-service.ts                # WSDOT Traffic API — mountain passes, alerts, travel times, toll rates, border waits, cameras
+      types.ts                          # Traffic domain types
+    ferry/
+      ferry-service.ts                  # WSF Ferry API — terminals, routes, schedule, vessel locations, space, alerts
+      types.ts                          # Ferry domain types
   mcp-server/
     tools/definitions/
-      [tool-name].tool.ts               # Tool definitions
-    resources/definitions/
-      [resource-name].resource.ts       # Resource definitions
-    prompts/definitions/
-      [prompt-name].prompt.ts           # Prompt definitions
+      get-mountain-passes.tool.ts       # wsdot_get_mountain_passes
+      search-alerts.tool.ts             # wsdot_search_alerts
+      get-travel-times.tool.ts          # wsdot_get_travel_times
+      get-toll-rates.tool.ts            # wsdot_get_toll_rates
+      get-border-waits.tool.ts          # wsdot_get_border_waits
+      search-cameras.tool.ts            # wsdot_search_cameras
+      get-ferry-terminals.tool.ts       # wsdot_get_ferry_terminals
+      get-ferry-routes.tool.ts          # wsdot_get_ferry_routes
+      get-ferry-schedule.tool.ts        # wsdot_get_ferry_schedule
+      get-vessel-locations.tool.ts      # wsdot_get_vessel_locations
+      get-terminal-space.tool.ts        # wsdot_get_terminal_space
+      get-ferry-alerts.tool.ts          # wsdot_get_ferry_alerts
 ```
 
 ---

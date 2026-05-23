@@ -18,8 +18,10 @@ import type {
   RawAlertListResponse,
   RawAlertSearchResponse,
   RawBorderCrossingsResponse,
+  RawCamera,
   RawCameraListResponse,
   RawCameraSearchResponse,
+  RawHighwayAlert,
   RawMountainPassResponse,
   RawTollRatesResponse,
   RawTravelTimesResponse,
@@ -289,33 +291,7 @@ export class TrafficApiService {
 
 // --- Normalization helpers ---
 
-function normalizeAlert(a: {
-  AlertID?: number | null;
-  HeadlineDescription?: string | null;
-  ExtendedDescription?: string | null;
-  EventCategory?: string | null;
-  EventStatus?: string | null;
-  Priority?: string | null;
-  Region?: string | null;
-  County?: string | null;
-  StartRoadwayLocation?: {
-    RoadName?: string | null;
-    Direction?: string | null;
-    MilePost?: number | null;
-    Latitude?: number | null;
-    Longitude?: number | null;
-  } | null;
-  EndRoadwayLocation?: {
-    RoadName?: string | null;
-    Direction?: string | null;
-    MilePost?: number | null;
-    Latitude?: number | null;
-    Longitude?: number | null;
-  } | null;
-  StartTime?: string | null;
-  EndTime?: string | null;
-  LastUpdatedTime?: string | null;
-}): HighwayAlert {
+function normalizeAlert(a: RawHighwayAlert): HighwayAlert {
   return {
     ...(a.AlertID != null && { alertId: a.AlertID }),
     ...(a.HeadlineDescription != null && { headlineDescription: a.HeadlineDescription }),
@@ -363,20 +339,7 @@ function normalizeAlert(a: {
   };
 }
 
-function normalizeCamera(c: {
-  CameraID?: number | null;
-  Title?: string | null;
-  Description?: string | null;
-  ImageURL?: string | null;
-  ImageWidth?: number | null;
-  ImageHeight?: number | null;
-  RoadName?: string | null;
-  Direction?: string | null;
-  MilePost?: number | null;
-  Region?: string | null;
-  Latitude?: number | null;
-  Longitude?: number | null;
-}): Camera {
+function normalizeCamera(c: RawCamera): Camera {
   return {
     ...(c.CameraID != null && { cameraId: c.CameraID }),
     ...(c.Title != null && { title: c.Title }),
