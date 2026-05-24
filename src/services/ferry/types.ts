@@ -23,24 +23,16 @@ export interface FerryTerminal {
 
 /** Raw ferry route from upstream API. */
 export interface RawFerryRoute {
-  ArrivingTerminalID?: number | null;
-  ArrivingTerminalName?: string | null;
-  CrossingTime?: number | null;
-  DepartingTerminalID?: number | null;
-  DepartingTerminalName?: string | null;
+  Description?: string | null;
+  RouteAbbrev?: string | null;
   RouteID?: number | null;
-  RouteName?: string | null;
 }
 
 /** Normalized ferry route. */
 export interface FerryRoute {
-  arrivingTerminalId?: number;
-  arrivingTerminalName?: string;
-  crossingTimeInMinutes?: number;
-  departingTerminalId?: number;
-  departingTerminalName?: string;
   routeId?: number;
-  routeName?: string;
+  routeAbbrev?: string;
+  description?: string;
 }
 
 /** Raw sailing in a schedule response. */

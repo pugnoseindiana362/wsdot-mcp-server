@@ -123,12 +123,8 @@ export class FerryApiService {
     const raw = await this.fetchJson<RawFerryRoute[]>(`Schedule/rest/routes/${tripDate}`, ctx);
     return (raw ?? []).map((r) => ({
       ...(r.RouteID != null && { routeId: r.RouteID }),
-      ...(r.RouteName != null && { routeName: r.RouteName }),
-      ...(r.CrossingTime != null && { crossingTimeInMinutes: r.CrossingTime }),
-      ...(r.DepartingTerminalID != null && { departingTerminalId: r.DepartingTerminalID }),
-      ...(r.DepartingTerminalName != null && { departingTerminalName: r.DepartingTerminalName }),
-      ...(r.ArrivingTerminalID != null && { arrivingTerminalId: r.ArrivingTerminalID }),
-      ...(r.ArrivingTerminalName != null && { arrivingTerminalName: r.ArrivingTerminalName }),
+      ...(r.RouteAbbrev != null && { routeAbbrev: r.RouteAbbrev }),
+      ...(r.Description != null && { description: r.Description }),
     }));
   }
 

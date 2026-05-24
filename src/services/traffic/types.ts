@@ -25,11 +25,6 @@ export interface RawMountainPass {
   WeatherCondition?: string | null;
 }
 
-/** Raw mountain pass container from upstream API. */
-export interface RawMountainPassResponse {
-  GetMountainPassConditionsAsJsonResult?: RawMountainPass[] | null;
-}
-
 /** Normalized travel restriction. */
 export interface TravelRestriction {
   comment?: string;
@@ -78,16 +73,6 @@ export interface RawHighwayAlert {
   StartTime?: string | null;
 }
 
-/** Raw highway alert search response. */
-export interface RawAlertSearchResponse {
-  SearchAlertsResult?: RawHighwayAlert[] | null;
-}
-
-/** Raw highway alert list response. */
-export interface RawAlertListResponse {
-  GetAlertsResult?: RawHighwayAlert[] | null;
-}
-
 /** Normalized roadway location. */
 export interface RoadwayLocation {
   direction?: string;
@@ -134,11 +119,6 @@ export interface RawTravelTime {
   TravelTimeID?: number | null;
 }
 
-/** Raw travel times response. */
-export interface RawTravelTimesResponse {
-  GetTravelTimesAsJsonResult?: RawTravelTime[] | null;
-}
-
 /** Normalized road time point. */
 export interface RoadTimePoint {
   direction?: string;
@@ -174,11 +154,6 @@ export interface RawTollRate {
   TripName?: string | null;
 }
 
-/** Raw toll rates response. */
-export interface RawTollRatesResponse {
-  GetTollRatesAsJsonResult?: RawTollRate[] | null;
-}
-
 /** Normalized toll rate. */
 export interface TollRate {
   endLocationName?: string;
@@ -211,11 +186,6 @@ export interface RawBorderCrossing {
   WaitTime?: number | null;
 }
 
-/** Raw border crossings response. */
-export interface RawBorderCrossingsResponse {
-  GetBorderCrossingsAsJsonResult?: RawBorderCrossing[] | null;
-}
-
 /** Normalized border crossing. */
 export interface BorderCrossing {
   crossingName?: string;
@@ -244,16 +214,6 @@ export interface RawCamera {
   Region?: string | null;
   RoadName?: string | null;
   Title?: string | null;
-}
-
-/** Raw camera search response. */
-export interface RawCameraSearchResponse {
-  SearchCamerasAsJsonResult?: RawCamera[] | null;
-}
-
-/** Raw camera list response. */
-export interface RawCameraListResponse {
-  GetCamerasAsJsonResult?: RawCamera[] | null;
 }
 
 /** Normalized camera. */

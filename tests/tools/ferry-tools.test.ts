@@ -100,12 +100,8 @@ describe('getFerryTerminals', () => {
 describe('getFerryRoutes', () => {
   const routeFixture = {
     routeId: 1,
-    routeName: 'Seattle/Bainbridge Island',
-    crossingTimeInMinutes: 35,
-    departingTerminalId: 7,
-    departingTerminalName: 'Seattle',
-    arrivingTerminalId: 3,
-    arrivingTerminalName: 'Bainbridge Island',
+    routeAbbrev: 'SEA-BI',
+    description: 'Seattle/Bainbridge Island',
   };
 
   it('returns routes for today when no date provided', async () => {
@@ -115,7 +111,7 @@ describe('getFerryRoutes', () => {
     const result = await getFerryRoutes.handler(input, ctx);
     expect(result.routes).toHaveLength(1);
     expect(result.totalCount).toBe(1);
-    expect(result.routes[0].routeName).toBe('Seattle/Bainbridge Island');
+    expect(result.routes[0].description).toBe('Seattle/Bainbridge Island');
     expect(result.tripDate).toBeDefined();
   });
 
@@ -143,11 +139,7 @@ describe('getFerryRoutes', () => {
     const blocks = getFerryRoutes.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Seattle/Bainbridge Island');
-    expect(text).toContain('35 min');
-    expect(text).toContain('Seattle');
-    expect(text).toContain('Bainbridge Island');
-    expect(text).toContain('7'); // departingTerminalId
-    expect(text).toContain('3'); // arrivingTerminalId
+    expect(text).toContain('SEA-BI');
     expect(text).toContain('1'); // routeId
   });
 });

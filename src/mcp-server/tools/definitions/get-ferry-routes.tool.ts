@@ -10,10 +10,9 @@ import { FerryApiService, getFerryApiService } from '@/services/ferry/ferry-serv
 export const getFerryRoutes = tool('wsdot_get_ferry_routes', {
   title: 'Get Ferry Routes',
   description:
-    'Returns all WSF ferry routes operating on a given date, including terminal ID pairs and crossing times. ' +
-    'Use this to discover which routes are running and to get the terminal IDs needed for ' +
-    'wsdot_get_ferry_schedule and wsdot_get_terminal_space. Route IDs also correspond to ' +
-    'impactedRouteIds in ferry alerts from wsdot_get_ferry_alerts.',
+    'Returns all WSF ferry routes operating on a given date. ' +
+    'Route IDs correspond to impactedRouteIds in ferry alerts from wsdot_get_ferry_alerts. ' +
+    'To get terminal IDs for schedule and space lookups, use wsdot_get_ferry_terminals.',
   annotations: { readOnlyHint: true },
   input: z.object({
     tripDate: z
@@ -35,21 +34,14 @@ export const getFerryRoutes = tool('wsdot_get_ferry_routes', {
               .describe(
                 'Numeric route identifier. Corresponds to impactedRouteIds in ferry alerts.',
               ),
-            routeName: z
+            routeAbbrev: z
               .string()
               .optional()
-              .describe('Route name (e.g. "Seattle/Bainbridge Island").'),
-            crossingTimeInMinutes: z
-              .number()
+              .describe('Short route abbreviation (e.g. "SEA-BBI").'),
+            description: z
+              .string()
               .optional()
-              .describe('Typical crossing time in minutes.'),
-            departingTerminalId: z
-              .number()
-              .optional()
-              .describe('Departing terminal ID for use in schedule and space lookups.'),
-            departingTerminalName: z.string().optional().describe('Departing terminal name.'),
-            arrivingTerminalId: z.number().optional().describe('Arriving terminal ID.'),
-            arrivingTerminalName: z.string().optional().describe('Arriving terminal name.'),
+              .describe('Full route description (e.g. "Seattle/Bainbridge Island").'),
           })
           .describe('A WSF ferry route operating on the requested date.'),
       )
@@ -90,17 +82,9 @@ export const getFerryRoutes = tool('wsdot_get_ferry_routes', {
       `## WSF Ferry Routes — ${result.tripDate} (${result.totalCount} routes)\n`,
     ];
     for (const r of result.routes) {
-      const name = r.routeName ?? 'Unknown route';
-      const crossing = r.crossingTimeInMinutes != null ? ` | ~${r.crossingTimeInMinutes} min` : '';
-      lines.push(`### ${name}${crossing}`);
-      if (r.departingTerminalId != null) {
-        lines.push(
-          `**Departing:** ${r.departingTerminalName ?? ''} (ID: ${r.departingTerminalId})`,
-        );
-      }
-      if (r.arrivingTerminalId != null) {
-        lines.push(`**Arriving:** ${r.arrivingTerminalName ?? ''} (ID: ${r.arrivingTerminalId})`);
-      }
+      const name = r.description ?? r.routeAbbrev ?? 'Unknown route';
+      lines.push(`### ${name}`);
+      if (r.routeAbbrev != null) lines.push(`**Abbrev:** ${r.routeAbbrev}`);
       if (r.routeId != null) lines.push(`**Route ID:** ${r.routeId}`);
       lines.push('');
     }
