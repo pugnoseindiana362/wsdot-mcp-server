@@ -11,7 +11,7 @@
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "wsdot-mcp-server",
+      "identifier": "@cyanheads/wsdot-mcp-server",
       "runtimeHint": "node",
       "version": "0.1.1",
       "packageArguments": [
@@ -46,7 +46,7 @@
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "wsdot-mcp-server",
+      "identifier": "@cyanheads/wsdot-mcp-server",
       "runtimeHint": "node",
       "version": "0.1.1",
       "packageArguments": [

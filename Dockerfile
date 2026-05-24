@@ -37,7 +37,7 @@ WORKDIR /usr/src/app
 ENV NODE_ENV=production
 
 # OCI image metadata (https://github.com/opencontainers/image-spec/blob/main/annotations.md)
-LABEL org.opencontainers.image.title="wsdot-mcp-server"
+LABEL org.opencontainers.image.title="@cyanheads/wsdot-mcp-server"
 LABEL org.opencontainers.image.description="Query WA highway conditions, ferry schedules, vessel locations, toll rates, border waits, and alerts via MCP."
 LABEL org.opencontainers.image.source="https://github.com/cyanheads/wsdot-mcp-server"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
