@@ -30,9 +30,9 @@ export interface RawFerryRoute {
 
 /** Normalized ferry route. */
 export interface FerryRoute {
-  routeId?: number;
-  routeAbbrev?: string;
   description?: string;
+  routeAbbrev?: string;
+  routeId?: number;
 }
 
 /** Raw sailing in a schedule response. */
