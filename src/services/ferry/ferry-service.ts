@@ -6,7 +6,7 @@
 
 import type { Context } from '@cyanheads/mcp-ts-core';
 import type { AppConfig } from '@cyanheads/mcp-ts-core/config';
-import { invalidParams, serviceUnavailable } from '@cyanheads/mcp-ts-core/errors';
+import { serviceUnavailable, validationError } from '@cyanheads/mcp-ts-core/errors';
 import type { StorageService } from '@cyanheads/mcp-ts-core/storage';
 import { withRetry } from '@cyanheads/mcp-ts-core/utils';
 import { getServerConfig } from '@/config/server-config.js';
@@ -77,7 +77,7 @@ export class FerryApiService {
           'Message' in (parsed as Record<string, unknown>)
         ) {
           const msg = (parsed as Record<string, unknown>).Message as string;
-          throw invalidParams(`WSF Ferry API error: ${msg}`, { url });
+          throw validationError(`WSF Ferry API error: ${msg}`, { url });
         }
         return parsed;
       },
@@ -93,7 +93,7 @@ export class FerryApiService {
   static toFerryDate(isoDate: string): string {
     const d = new Date(isoDate);
     if (Number.isNaN(d.getTime())) {
-      throw invalidParams(
+      throw validationError(
         `Invalid date: "${isoDate}". Expected ISO 8601 format (e.g. 2026-05-23).`,
       );
     }

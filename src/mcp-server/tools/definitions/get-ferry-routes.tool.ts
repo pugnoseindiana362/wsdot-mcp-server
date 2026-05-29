@@ -61,7 +61,7 @@ export const getFerryRoutes = tool('wsdot_get_ferry_routes', {
     },
     {
       reason: 'invalid_date',
-      code: JsonRpcErrorCode.InvalidParams,
+      code: JsonRpcErrorCode.ValidationError,
       when: 'The provided tripDate is not a valid ISO 8601 date.',
       recovery: 'Provide a valid date in YYYY-MM-DD format, such as 2026-05-23.',
     },

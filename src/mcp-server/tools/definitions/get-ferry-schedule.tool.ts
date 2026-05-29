@@ -64,14 +64,14 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
     },
     {
       reason: 'invalid_terminal_pair',
-      code: JsonRpcErrorCode.InvalidParams,
+      code: JsonRpcErrorCode.ValidationError,
       when: 'The terminal ID pair is invalid or does not form a valid ferry route.',
       recovery:
         'Use wsdot_get_ferry_terminals to list valid terminal IDs and wsdot_get_ferry_routes to find valid pairs.',
     },
     {
       reason: 'invalid_date',
-      code: JsonRpcErrorCode.InvalidParams,
+      code: JsonRpcErrorCode.ValidationError,
       when: 'The provided tripDate is not a valid ISO 8601 date.',
       recovery: 'Provide a valid date in YYYY-MM-DD format, such as 2026-05-23.',
     },

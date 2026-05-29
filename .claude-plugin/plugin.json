@@ -1,0 +1,21 @@
+{
+  "name": "@cyanheads/wsdot-mcp-server",
+  "version": "0.1.4",
+  "description": "Query WA highway conditions, ferry schedules, vessel locations, toll rates, border waits, and alerts via MCP. STDIO or Streamable HTTP.",
+  "author": {
+    "name": "cyanheads"
+  },
+  "homepage": "https://github.com/cyanheads/wsdot-mcp-server#readme",
+  "repository": "https://github.com/cyanheads/wsdot-mcp-server",
+  "license": "Apache-2.0",
+  "mcpServers": {
+    "@cyanheads/wsdot-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "@cyanheads/wsdot-mcp-server"],
+      "env": {
+        "MCP_TRANSPORT_TYPE": "stdio",
+        "WSDOT_ACCESS_CODE": ""
+      }
+    }
+  }
+}

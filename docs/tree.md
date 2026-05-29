@@ -1,10 +1,15 @@
 # wsdot-mcp-server - Directory Structure
 
-Generated on: 2026-05-23 19:55:02
+Generated on: 2026-05-29 05:48:39
 
 ```text
 wsdot-mcp-server/
 ├── .claude/
+├── .claude-plugin/
+│   └── plugin.json
+├── .codex-plugin/
+│   ├── mcp.json
+│   └── plugin.json
 ├── .github/
 │   └── ISSUE_TEMPLATE/
 │       ├── bug_report.yml
@@ -75,13 +80,15 @@ wsdot-mcp-server/
 │   │   └── SKILL.md
 │   ├── api-workers/
 │   │   └── SKILL.md
+│   ├── code-simplifier/
+│   │   └── SKILL.md
 │   ├── design-mcp-server/
 │   │   └── SKILL.md
 │   ├── field-test/
 │   │   └── SKILL.md
-│   ├── maintenance/
+│   ├── git-wrapup/
 │   │   └── SKILL.md
-│   ├── migrate-mcp-ts-template/
+│   ├── maintenance/
 │   │   └── SKILL.md
 │   ├── polish-docs-meta/
 │   │   ├── references/
@@ -147,6 +154,7 @@ wsdot-mcp-server/
 ├── bun.lock
 ├── bunfig.toml
 ├── CHANGELOG.md
+├── CITATION.cff
 ├── CLAUDE.md
 ├── devcheck.config.json
 ├── Dockerfile

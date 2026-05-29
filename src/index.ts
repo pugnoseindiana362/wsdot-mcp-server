@@ -41,6 +41,7 @@ await createApp({
   prompts: [],
   instructions:
     'WSDOT Traveler Information server for Washington State. Traffic tools (mountain passes, alerts, travel times, toll rates, border waits, cameras) use the WSDOT Traffic API. Ferry tools use the WSF Ferry API. For ferry schedule and space lookups, first call wsdot_get_ferry_terminals to resolve terminal names to numeric IDs. Ferry route IDs from wsdot_get_ferry_routes correspond to impactedRouteIds in wsdot_get_ferry_alerts.',
+  landing: { requireAuth: false },
   setup(core) {
     initTrafficApiService(core.config, core.storage);
     initFerryApiService(core.config, core.storage);
