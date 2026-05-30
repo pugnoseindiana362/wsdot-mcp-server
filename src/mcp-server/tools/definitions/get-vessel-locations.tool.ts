@@ -64,8 +64,15 @@ export const getVesselLocations = tool('wsdot_get_vessel_locations', {
           .describe('Real-time position and status for one WSF vessel.'),
       )
       .describe('All WSF vessels with real-time position data.'),
-    totalCount: z.number().describe('Total number of vessels returned.'),
   }),
+
+  enrichment: {
+    totalCount: z.number().describe('Total number of vessels returned.'),
+    notice: z
+      .string()
+      .optional()
+      .describe('Optional notice when no vessel data is available. Absent on normal results.'),
+  },
 
   errors: [
     {
@@ -81,14 +88,22 @@ export const getVesselLocations = tool('wsdot_get_vessel_locations', {
   async handler(_input, ctx) {
     const vessels = await getFerryApiService().getVesselLocations(ctx);
     ctx.log.info('Vessel locations fetched', { count: vessels.length });
-    return { vessels, totalCount: vessels.length };
+
+    ctx.enrich({ totalCount: vessels.length });
+    if (vessels.length === 0) {
+      ctx.enrich.notice(
+        'No vessel location data available. The WSF API may be temporarily unavailable — retry in 30 seconds.',
+      );
+    }
+
+    return { vessels };
   },
 
   format: (result) => {
     if (result.vessels.length === 0) {
-      return [{ type: 'text', text: 'No vessel location data available. **Total:** 0' }];
+      return [{ type: 'text', text: 'No vessel location data available.' }];
     }
-    const lines: string[] = [`## WSF Vessel Locations (${result.totalCount} vessels)\n`];
+    const lines: string[] = [];
     for (const v of result.vessels) {
       const name = v.vesselName ?? `Vessel ${v.vesselId ?? '?'}`;
       lines.push(`### ${name}`);

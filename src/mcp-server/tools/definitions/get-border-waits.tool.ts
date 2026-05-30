@@ -40,8 +40,15 @@ export const getBorderWaits = tool('wsdot_get_border_waits', {
           .describe('Wait time data for one border crossing.'),
       )
       .describe('All WA/Canada border crossing wait times.'),
-    totalCount: z.number().describe('Total number of crossings returned.'),
   }),
+
+  enrichment: {
+    totalCount: z.number().describe('Total number of crossings returned.'),
+    notice: z
+      .string()
+      .optional()
+      .describe('Optional notice when no crossing data is available. Absent on normal results.'),
+  },
 
   errors: [
     {
@@ -57,14 +64,22 @@ export const getBorderWaits = tool('wsdot_get_border_waits', {
   async handler(_input, ctx) {
     const crossings = await getTrafficApiService().getBorderCrossings(ctx);
     ctx.log.info('Border crossings fetched', { count: crossings.length });
-    return { crossings, totalCount: crossings.length };
+
+    ctx.enrich({ totalCount: crossings.length });
+    if (crossings.length === 0) {
+      ctx.enrich.notice(
+        'No border crossing data available. The WSDOT API may be temporarily unavailable — retry in 30 seconds.',
+      );
+    }
+
+    return { crossings };
   },
 
   format: (result) => {
     if (result.crossings.length === 0) {
-      return [{ type: 'text', text: 'No border crossing data available. **Total:** 0' }];
+      return [{ type: 'text', text: 'No border crossing data available.' }];
     }
-    const lines: string[] = [`## WA/Canada Border Wait Times (${result.totalCount} crossings)\n`];
+    const lines: string[] = [];
     for (const c of result.crossings) {
       lines.push(`### ${c.crossingName ?? 'Border Crossing'}`);
       if (c.waitTimeInMinutes != null) {

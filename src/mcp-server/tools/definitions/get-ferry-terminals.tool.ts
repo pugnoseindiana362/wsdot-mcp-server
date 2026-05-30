@@ -32,8 +32,15 @@ export const getFerryTerminals = tool('wsdot_get_ferry_terminals', {
           .describe('A WSF ferry terminal with its ID and location.'),
       )
       .describe('All WSF ferry terminals.'),
-    totalCount: z.number().describe('Total number of terminals.'),
   }),
+
+  enrichment: {
+    totalCount: z.number().describe('Total number of terminals returned.'),
+    notice: z
+      .string()
+      .optional()
+      .describe('Optional notice when no terminal data is available. Absent on normal results.'),
+  },
 
   errors: [
     {
@@ -49,11 +56,22 @@ export const getFerryTerminals = tool('wsdot_get_ferry_terminals', {
   async handler(_input, ctx) {
     const terminals = await getFerryApiService().getTerminals(ctx);
     ctx.log.info('Ferry terminals fetched', { count: terminals.length });
-    return { terminals, totalCount: terminals.length };
+
+    ctx.enrich({ totalCount: terminals.length });
+    if (terminals.length === 0) {
+      ctx.enrich.notice(
+        'No terminal data available. The WSF API may be temporarily unavailable — retry in 30 seconds.',
+      );
+    }
+
+    return { terminals };
   },
 
   format: (result) => {
-    const lines: string[] = [`## WSF Ferry Terminals (${result.totalCount})\n`];
+    if (result.terminals.length === 0) {
+      return [{ type: 'text', text: 'No ferry terminal data available.' }];
+    }
+    const lines: string[] = [];
     for (const t of result.terminals) {
       const abbrev = t.terminalAbbrev ? ` (${t.terminalAbbrev})` : '';
       const coords =

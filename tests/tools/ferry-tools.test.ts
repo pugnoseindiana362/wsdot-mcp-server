@@ -4,7 +4,7 @@
  * @module tests/tools/ferry-tools.test
  */
 
-import { createMockContext } from '@cyanheads/mcp-ts-core/testing';
+import { createMockContext, getEnrichment } from '@cyanheads/mcp-ts-core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // --- Mocks (hoisted so vi.mock factory runs before imports) ---
@@ -58,9 +58,28 @@ describe('getFerryTerminals', () => {
     const input = getFerryTerminals.input.parse({});
     const result = await getFerryTerminals.handler(input, ctx);
     expect(result.terminals).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
     expect(result.terminals[0].terminalId).toBe(3);
     expect(result.terminals[0].terminalName).toBe('Bainbridge Island');
+  });
+
+  it('enriches with totalCount', async () => {
+    mockService.getTerminals.mockResolvedValue([terminalFixture]);
+    const ctx = createMockContext();
+    const input = getFerryTerminals.input.parse({});
+    await getFerryTerminals.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches notice when no terminals returned', async () => {
+    mockService.getTerminals.mockResolvedValue([]);
+    const ctx = createMockContext();
+    const input = getFerryTerminals.input.parse({});
+    await getFerryTerminals.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
   });
 
   it('returns empty terminals list', async () => {
@@ -69,11 +88,10 @@ describe('getFerryTerminals', () => {
     const input = getFerryTerminals.input.parse({});
     const result = await getFerryTerminals.handler(input, ctx);
     expect(result.terminals).toHaveLength(0);
-    expect(result.totalCount).toBe(0);
   });
 
   it('formats terminals with ID and name', () => {
-    const output = { terminals: [terminalFixture], totalCount: 1 };
+    const output = { terminals: [terminalFixture] };
     const blocks = getFerryTerminals.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Bainbridge Island');
@@ -85,7 +103,7 @@ describe('getFerryTerminals', () => {
 
   it('handles sparse terminal (no optional fields)', () => {
     const sparse = { terminalId: 7, terminalName: 'Seattle' };
-    const output = { terminals: [sparse], totalCount: 1 };
+    const output = { terminals: [sparse] };
     const blocks = getFerryTerminals.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Seattle');
@@ -110,9 +128,28 @@ describe('getFerryRoutes', () => {
     const input = getFerryRoutes.input.parse({});
     const result = await getFerryRoutes.handler(input, ctx);
     expect(result.routes).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
     expect(result.routes[0].description).toBe('Seattle/Bainbridge Island');
-    expect(result.tripDate).toBeDefined();
+  });
+
+  it('enriches with totalCount and tripDate', async () => {
+    mockService.getRoutes.mockResolvedValue([routeFixture]);
+    const ctx = createMockContext();
+    const input = getFerryRoutes.input.parse({ tripDate: '2026-05-23' });
+    await getFerryRoutes.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.tripDate).toBe('2026-05-23');
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches notice when no routes returned', async () => {
+    mockService.getRoutes.mockResolvedValue([]);
+    const ctx = createMockContext();
+    const input = getFerryRoutes.input.parse({ tripDate: '2026-05-23' });
+    await getFerryRoutes.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
   });
 
   it('returns routes for a specific date', async () => {
@@ -121,7 +158,6 @@ describe('getFerryRoutes', () => {
     const input = getFerryRoutes.input.parse({ tripDate: '2026-05-23' });
     const result = await getFerryRoutes.handler(input, ctx);
     expect(result.routes).toHaveLength(1);
-    expect(result.tripDate).toBe('2026-05-23');
     expect(mockService.getRoutes).toHaveBeenCalledWith('2026-05-23', ctx);
   });
 
@@ -131,11 +167,10 @@ describe('getFerryRoutes', () => {
     const input = getFerryRoutes.input.parse({});
     const result = await getFerryRoutes.handler(input, ctx);
     expect(result.routes).toHaveLength(0);
-    expect(result.totalCount).toBe(0);
   });
 
   it('formats routes with key fields', () => {
-    const output = { routes: [routeFixture], tripDate: '2026-05-23', totalCount: 1 };
+    const output = { routes: [routeFixture] };
     const blocks = getFerryRoutes.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Seattle/Bainbridge Island');
@@ -178,9 +213,39 @@ describe('getFerrySchedule', () => {
     });
     const result = await getFerrySchedule.handler(input, ctx);
     expect(result.sailings).toHaveLength(2);
-    expect(result.totalSailings).toBe(2);
     expect(result.departingTerminalName).toBe('Seattle');
     expect(result.arrivingTerminalName).toBe('Bainbridge Island');
+  });
+
+  it('enriches with tripDate, remainingOnly, and totalSailings', async () => {
+    mockService.getSchedule.mockResolvedValue(scheduleFixture);
+    const ctx = createMockContext();
+    const input = getFerrySchedule.input.parse({
+      departingTerminalId: 7,
+      arrivingTerminalId: 3,
+    });
+    await getFerrySchedule.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalSailings).toBe(2);
+    expect(enrichment.remainingOnly).toBe(false);
+    expect(enrichment.tripDate).toBeDefined();
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches notice when no sailings returned', async () => {
+    mockService.getSchedule.mockResolvedValue({
+      ...scheduleFixture,
+      sailings: [],
+    });
+    const ctx = createMockContext();
+    const input = getFerrySchedule.input.parse({
+      departingTerminalId: 7,
+      arrivingTerminalId: 3,
+    });
+    await getFerrySchedule.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalSailings).toBe(0);
+    expect(enrichment.notice).toBeDefined();
   });
 
   it('defaults remainingOnly to false', async () => {
@@ -190,8 +255,7 @@ describe('getFerrySchedule', () => {
       departingTerminalId: 7,
       arrivingTerminalId: 3,
     });
-    const result = await getFerrySchedule.handler(input, ctx);
-    expect(result.remainingOnly).toBe(false);
+    await getFerrySchedule.handler(input, ctx);
     expect(mockService.getSchedule).toHaveBeenCalledWith(7, 3, expect.any(String), false, ctx);
   });
 
@@ -215,8 +279,7 @@ describe('getFerrySchedule', () => {
       arrivingTerminalId: 3,
       tripDate: '2026-05-23',
     });
-    const result = await getFerrySchedule.handler(input, ctx);
-    expect(result.tripDate).toBe('2026-05-23');
+    await getFerrySchedule.handler(input, ctx);
     expect(mockService.getSchedule).toHaveBeenCalledWith(7, 3, '2026-05-23', false, ctx);
   });
 
@@ -224,8 +287,6 @@ describe('getFerrySchedule', () => {
     const output = {
       departingTerminalName: 'Seattle',
       arrivingTerminalName: 'Bainbridge Island',
-      tripDate: '2026-05-23',
-      remainingOnly: false,
       sailings: [
         {
           departureTime: '6:00 AM',
@@ -235,13 +296,10 @@ describe('getFerrySchedule', () => {
         },
         { departureTime: '7:00 AM', isCancelled: true },
       ],
-      totalSailings: 2,
     };
     const blocks = getFerrySchedule.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Seattle → Bainbridge Island');
-    expect(text).toContain('2026-05-23');
-    expect(text).toContain('2'); // totalSailings
     expect(text).toContain('6:00 AM');
     expect(text).toContain('Yakima');
     expect(text).toContain('CANCELLED');
@@ -249,10 +307,7 @@ describe('getFerrySchedule', () => {
 
   it('formats empty sailings list', () => {
     const output = {
-      tripDate: '2026-05-23',
-      remainingOnly: false,
       sailings: [],
-      totalSailings: 0,
     };
     const blocks = getFerrySchedule.format!(output);
     const text = (blocks[0] as { text: string }).text;
@@ -291,10 +346,29 @@ describe('getVesselLocations', () => {
     const input = getVesselLocations.input.parse({});
     const result = await getVesselLocations.handler(input, ctx);
     expect(result.vessels).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
     expect(result.vessels[0].vesselName).toBe('Yakima');
     expect(result.vessels[0].speed).toBe(12.5);
     expect(result.vessels[0].opRouteAbbrev).toEqual(['SEA-BI']);
+  });
+
+  it('enriches with totalCount', async () => {
+    mockService.getVesselLocations.mockResolvedValue([vesselFixture]);
+    const ctx = createMockContext();
+    const input = getVesselLocations.input.parse({});
+    await getVesselLocations.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches notice when no vessels returned', async () => {
+    mockService.getVesselLocations.mockResolvedValue([]);
+    const ctx = createMockContext();
+    const input = getVesselLocations.input.parse({});
+    await getVesselLocations.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
   });
 
   it('returns empty vessels list', async () => {
@@ -303,11 +377,10 @@ describe('getVesselLocations', () => {
     const input = getVesselLocations.input.parse({});
     const result = await getVesselLocations.handler(input, ctx);
     expect(result.vessels).toHaveLength(0);
-    expect(result.totalCount).toBe(0);
   });
 
   it('formats vessels with key fields', () => {
-    const output = { vessels: [vesselFixture], totalCount: 1 };
+    const output = { vessels: [vesselFixture] };
     const blocks = getVesselLocations.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Yakima');
@@ -322,15 +395,14 @@ describe('getVesselLocations', () => {
   });
 
   it('formats empty vessels list', () => {
-    const blocks = getVesselLocations.format!({ vessels: [], totalCount: 0 });
+    const blocks = getVesselLocations.format!({ vessels: [] });
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('No vessel location data');
-    expect(text).toContain('0');
   });
 
   it('handles sparse vessel (minimal fields, empty opRouteAbbrev)', () => {
     const sparse = { vesselId: 5, vesselName: 'Wenatchee', opRouteAbbrev: [] };
-    const output = { vessels: [sparse], totalCount: 1 };
+    const output = { vessels: [sparse] };
     const blocks = getVesselLocations.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Wenatchee');
@@ -366,7 +438,36 @@ describe('getTerminalSpace', () => {
     const input = getTerminalSpace.input.parse({});
     const result = await getTerminalSpace.handler(input, ctx);
     expect(result.terminals).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
+  });
+
+  it('enriches with totalCount and no terminalFilter when no filter', async () => {
+    mockService.getTerminalSailingSpace.mockResolvedValue([terminalSpaceFixture]);
+    const ctx = createMockContext();
+    const input = getTerminalSpace.input.parse({});
+    await getTerminalSpace.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.terminalFilter).toBeUndefined();
+  });
+
+  it('enriches terminalFilter when filter provided', async () => {
+    mockService.getTerminalSailingSpace.mockResolvedValue([terminalSpaceFixture]);
+    const ctx = createMockContext();
+    const input = getTerminalSpace.input.parse({ departingTerminalId: 7 });
+    await getTerminalSpace.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.terminalFilter).toBe(7);
+  });
+
+  it('enriches notice when filter matches no terminal', async () => {
+    mockService.getTerminalSailingSpace.mockResolvedValue([terminalSpaceFixture]);
+    const ctx = createMockContext();
+    const input = getTerminalSpace.input.parse({ departingTerminalId: 999 });
+    await getTerminalSpace.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
+    expect(enrichment.notice).toContain('999');
   });
 
   it('filters to a specific terminal by ID', async () => {
@@ -382,20 +483,10 @@ describe('getTerminalSpace', () => {
     const result = await getTerminalSpace.handler(input, ctx);
     expect(result.terminals).toHaveLength(1);
     expect(result.terminals[0].terminalId).toBe(7);
-    expect(result.totalCount).toBe(1);
-  });
-
-  it('returns empty when filter matches no terminal', async () => {
-    mockService.getTerminalSailingSpace.mockResolvedValue([terminalSpaceFixture]);
-    const ctx = createMockContext();
-    const input = getTerminalSpace.input.parse({ departingTerminalId: 999 });
-    const result = await getTerminalSpace.handler(input, ctx);
-    expect(result.terminals).toHaveLength(0);
-    expect(result.totalCount).toBe(0);
   });
 
   it('formats terminal space with key fields', () => {
-    const output = { terminals: [terminalSpaceFixture], totalCount: 1 };
+    const output = { terminals: [terminalSpaceFixture] };
     const blocks = getTerminalSpace.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Seattle');
@@ -412,17 +503,16 @@ describe('getTerminalSpace', () => {
       ...terminalSpaceFixture,
       departingSpaces: [{ ...terminalSpaceFixture.departingSpaces[0], driveUpSpaceCount: 0 }],
     };
-    const output = { terminals: [fullTerminal], totalCount: 1 };
+    const output = { terminals: [fullTerminal] };
     const blocks = getTerminalSpace.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('FULL');
   });
 
   it('formats empty terminals list', () => {
-    const blocks = getTerminalSpace.format!({ terminals: [], totalCount: 0 });
+    const blocks = getTerminalSpace.format!({ terminals: [] });
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('No terminal space data');
-    expect(text).toContain('0');
   });
 });
 
@@ -444,9 +534,29 @@ describe('getFerryAlerts', () => {
     const input = getFerryAlerts.input.parse({});
     const result = await getFerryAlerts.handler(input, ctx);
     expect(result.alerts).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
     expect(result.alerts[0].alertId).toBe(201);
     expect(result.alerts[0].impactedRouteIds).toEqual([1, 2]);
+  });
+
+  it('enriches with totalCount', async () => {
+    mockService.getAlerts.mockResolvedValue([alertFixture]);
+    const ctx = createMockContext();
+    const input = getFerryAlerts.input.parse({});
+    await getFerryAlerts.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches notice when no alerts', async () => {
+    mockService.getAlerts.mockResolvedValue([]);
+    const ctx = createMockContext();
+    const input = getFerryAlerts.input.parse({});
+    await getFerryAlerts.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
+    expect(enrichment.notice).toContain('No active');
   });
 
   it('returns empty alerts list', async () => {
@@ -455,11 +565,10 @@ describe('getFerryAlerts', () => {
     const input = getFerryAlerts.input.parse({});
     const result = await getFerryAlerts.handler(input, ctx);
     expect(result.alerts).toHaveLength(0);
-    expect(result.totalCount).toBe(0);
   });
 
   it('formats alerts with key fields', () => {
-    const output = { alerts: [alertFixture], totalCount: 1 };
+    const output = { alerts: [alertFixture] };
     const blocks = getFerryAlerts.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('201'); // alertId
@@ -469,10 +578,9 @@ describe('getFerryAlerts', () => {
   });
 
   it('formats empty alerts list', () => {
-    const blocks = getFerryAlerts.format!({ alerts: [], totalCount: 0 });
+    const blocks = getFerryAlerts.format!({ alerts: [] });
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('No active ferry alerts');
-    expect(text).toContain('0');
   });
 
   it('handles alert with empty impactedRouteIds', () => {
@@ -481,7 +589,7 @@ describe('getFerryAlerts', () => {
       alertDescription: 'Maintenance notice.',
       impactedRouteIds: [],
     };
-    const output = { alerts: [alertNoRoutes], totalCount: 1 };
+    const output = { alerts: [alertNoRoutes] };
     const blocks = getFerryAlerts.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Maintenance notice');

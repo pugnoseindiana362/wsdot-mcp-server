@@ -46,9 +46,18 @@ export const getFerryRoutes = tool('wsdot_get_ferry_routes', {
           .describe('A WSF ferry route operating on the requested date.'),
       )
       .describe('Ferry routes operating on the requested date.'),
+  }),
+
+  enrichment: {
     tripDate: z.string().describe('Date for which routes were retrieved (ISO 8601).'),
     totalCount: z.number().describe('Total number of routes returned.'),
-  }),
+    notice: z
+      .string()
+      .optional()
+      .describe(
+        'Optional notice when no routes are available for the date. Absent on normal results.',
+      ),
+  },
 
   errors: [
     {
@@ -74,13 +83,22 @@ export const getFerryRoutes = tool('wsdot_get_ferry_routes', {
 
     const routes = await getFerryApiService().getRoutes(tripDate, ctx);
     ctx.log.info('Ferry routes fetched', { tripDate, count: routes.length });
-    return { routes, tripDate, totalCount: routes.length };
+
+    ctx.enrich({ tripDate, totalCount: routes.length });
+    if (routes.length === 0) {
+      ctx.enrich.notice(
+        `No ferry routes found for ${tripDate}. The WSF API may be temporarily unavailable or no routes operate on this date — retry in 30 seconds.`,
+      );
+    }
+
+    return { routes };
   },
 
   format: (result) => {
-    const lines: string[] = [
-      `## WSF Ferry Routes — ${result.tripDate} (${result.totalCount} routes)\n`,
-    ];
+    if (result.routes.length === 0) {
+      return [{ type: 'text', text: 'No ferry routes found for this date.' }];
+    }
+    const lines: string[] = [];
     for (const r of result.routes) {
       const name = r.description ?? r.routeAbbrev ?? 'Unknown route';
       lines.push(`### ${name}`);

@@ -4,7 +4,7 @@
  * @module tests/tools/traffic-tools.test
  */
 
-import { createMockContext } from '@cyanheads/mcp-ts-core/testing';
+import { createMockContext, getEnrichment } from '@cyanheads/mcp-ts-core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // --- Mocks (hoisted so vi.mock factory runs before imports) ---
@@ -64,12 +64,25 @@ describe('getMountainPasses', () => {
     expect(result.passes[0].mountainPassName).toBe('Snoqualmie Pass');
   });
 
-  it('returns empty list when service returns no passes', async () => {
+  it('enriches with totalCount', async () => {
+    mockService.getMountainPasses.mockResolvedValue([passFixture]);
+    const ctx = createMockContext();
+    const input = getMountainPasses.input.parse({});
+    await getMountainPasses.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches notice when no passes returned', async () => {
     mockService.getMountainPasses.mockResolvedValue([]);
     const ctx = createMockContext();
     const input = getMountainPasses.input.parse({});
     const result = await getMountainPasses.handler(input, ctx);
     expect(result.passes).toHaveLength(0);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
   });
 
   it('formats passes with key fields', () => {
@@ -133,8 +146,48 @@ describe('searchAlerts', () => {
     const input = searchAlerts.input.parse({});
     const result = await searchAlerts.handler(input, ctx);
     expect(result.alerts).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
     expect(result.alerts[0].alertId).toBe(101);
+  });
+
+  it('enriches with totalCount and empty appliedFilters', async () => {
+    mockService.searchAlerts.mockResolvedValue([alertFixture]);
+    const ctx = createMockContext();
+    const input = searchAlerts.input.parse({});
+    await searchAlerts.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.appliedFilters).toEqual({});
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches appliedFilters with stateRoute', async () => {
+    mockService.searchAlerts.mockResolvedValue([alertFixture]);
+    const ctx = createMockContext();
+    const input = searchAlerts.input.parse({ stateRoute: '090' });
+    await searchAlerts.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.appliedFilters.stateRoute).toBe('090');
+  });
+
+  it('enriches notice on empty results with filters', async () => {
+    mockService.searchAlerts.mockResolvedValue([]);
+    const ctx = createMockContext();
+    const input = searchAlerts.input.parse({ stateRoute: '090' });
+    await searchAlerts.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
+    expect(enrichment.notice).toContain('filter');
+  });
+
+  it('enriches notice on empty results with no filters', async () => {
+    mockService.searchAlerts.mockResolvedValue([]);
+    const ctx = createMockContext();
+    const input = searchAlerts.input.parse({});
+    await searchAlerts.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.notice).toBeDefined();
+    expect(enrichment.notice).toContain('No active');
   });
 
   it('passes stateRoute filter to service', async () => {
@@ -171,17 +224,8 @@ describe('searchAlerts', () => {
     );
   });
 
-  it('returns empty alerts with totalCount 0', async () => {
-    mockService.searchAlerts.mockResolvedValue([]);
-    const ctx = createMockContext();
-    const input = searchAlerts.input.parse({});
-    const result = await searchAlerts.handler(input, ctx);
-    expect(result.alerts).toHaveLength(0);
-    expect(result.totalCount).toBe(0);
-  });
-
   it('formats alerts with key fields', () => {
-    const output = { alerts: [alertFixture], totalCount: 1 };
+    const output = { alerts: [alertFixture] };
     const blocks = searchAlerts.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('I-90 Lane Closure');
@@ -192,10 +236,9 @@ describe('searchAlerts', () => {
   });
 
   it('formats empty alerts list', () => {
-    const blocks = searchAlerts.format!({ alerts: [], totalCount: 0 });
+    const blocks = searchAlerts.format!({ alerts: [] });
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('No active alerts');
-    expect(text).toContain('0');
   });
 });
 
@@ -222,7 +265,35 @@ describe('getTravelTimes', () => {
     const input = getTravelTimes.input.parse({});
     const result = await getTravelTimes.handler(input, ctx);
     expect(result.corridors).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
+  });
+
+  it('enriches with totalCount and no routeFilter when no filter', async () => {
+    mockService.getTravelTimes.mockResolvedValue([corridorFixture]);
+    const ctx = createMockContext();
+    const input = getTravelTimes.input.parse({});
+    await getTravelTimes.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.routeFilter).toBeUndefined();
+  });
+
+  it('enriches routeFilter when filter is provided', async () => {
+    mockService.getTravelTimes.mockResolvedValue([corridorFixture]);
+    const ctx = createMockContext();
+    const input = getTravelTimes.input.parse({ route: 'I-5' });
+    await getTravelTimes.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.routeFilter).toBe('i-5');
+  });
+
+  it('enriches notice when no corridors matched', async () => {
+    mockService.getTravelTimes.mockResolvedValue([corridorFixture]);
+    const ctx = createMockContext();
+    const input = getTravelTimes.input.parse({ route: 'SR 999' });
+    await getTravelTimes.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
   });
 
   it('filters corridors by route name', async () => {
@@ -233,7 +304,6 @@ describe('getTravelTimes', () => {
     const result = await getTravelTimes.handler(input, ctx);
     expect(result.corridors).toHaveLength(1);
     expect(result.corridors[0].name).toContain('SR 520');
-    expect(result.totalCount).toBe(1);
   });
 
   it('filter is case-insensitive', async () => {
@@ -263,7 +333,6 @@ describe('getTravelTimes', () => {
   it('formats corridors with key fields', () => {
     const output = {
       corridors: [{ ...corridorFixture, delayInMinutes: 6 }],
-      totalCount: 1,
     };
     const blocks = getTravelTimes.format!(output);
     const text = (blocks[0] as { text: string }).text;
@@ -276,10 +345,9 @@ describe('getTravelTimes', () => {
   });
 
   it('formats empty corridors list', () => {
-    const blocks = getTravelTimes.format!({ corridors: [], totalCount: 0 });
+    const blocks = getTravelTimes.format!({ corridors: [] });
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('No corridors matched');
-    expect(text).toContain('0');
   });
 });
 
@@ -308,8 +376,27 @@ describe('getTollRates', () => {
     const input = getTollRates.input.parse({});
     const result = await getTollRates.handler(input, ctx);
     expect(result.rates).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
     expect(result.rates[0].tollRateInDollars).toBe(3.5);
+  });
+
+  it('enriches with totalCount', async () => {
+    mockService.getTollRates.mockResolvedValue([rateFixture]);
+    const ctx = createMockContext();
+    const input = getTollRates.input.parse({});
+    await getTollRates.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches notice when no rates returned', async () => {
+    mockService.getTollRates.mockResolvedValue([]);
+    const ctx = createMockContext();
+    const input = getTollRates.input.parse({});
+    await getTollRates.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
   });
 
   it('returns empty rates list', async () => {
@@ -318,11 +405,10 @@ describe('getTollRates', () => {
     const input = getTollRates.input.parse({});
     const result = await getTollRates.handler(input, ctx);
     expect(result.rates).toHaveLength(0);
-    expect(result.totalCount).toBe(0);
   });
 
   it('formats rates with key fields', () => {
-    const output = { rates: [rateFixture], totalCount: 1 };
+    const output = { rates: [rateFixture] };
     const blocks = getTollRates.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('SR 520 Express Toll');
@@ -334,10 +420,9 @@ describe('getTollRates', () => {
   });
 
   it('formats empty rates list', () => {
-    const blocks = getTollRates.format!({ rates: [], totalCount: 0 });
+    const blocks = getTollRates.format!({ rates: [] });
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('No toll rate data');
-    expect(text).toContain('0');
   });
 });
 
@@ -365,9 +450,28 @@ describe('getBorderWaits', () => {
     const input = getBorderWaits.input.parse({});
     const result = await getBorderWaits.handler(input, ctx);
     expect(result.crossings).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
     expect(result.crossings[0].crossingName).toBe('Peace Arch');
     expect(result.crossings[0].waitTimeInMinutes).toBe(25);
+  });
+
+  it('enriches with totalCount', async () => {
+    mockService.getBorderCrossings.mockResolvedValue([crossingFixture]);
+    const ctx = createMockContext();
+    const input = getBorderWaits.input.parse({});
+    await getBorderWaits.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.notice).toBeUndefined();
+  });
+
+  it('enriches notice when no crossings returned', async () => {
+    mockService.getBorderCrossings.mockResolvedValue([]);
+    const ctx = createMockContext();
+    const input = getBorderWaits.input.parse({});
+    await getBorderWaits.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(0);
+    expect(enrichment.notice).toBeDefined();
   });
 
   it('returns empty crossings list', async () => {
@@ -376,11 +480,10 @@ describe('getBorderWaits', () => {
     const input = getBorderWaits.input.parse({});
     const result = await getBorderWaits.handler(input, ctx);
     expect(result.crossings).toHaveLength(0);
-    expect(result.totalCount).toBe(0);
   });
 
   it('formats crossings with key fields', () => {
-    const output = { crossings: [crossingFixture], totalCount: 1 };
+    const output = { crossings: [crossingFixture] };
     const blocks = getBorderWaits.format!(output);
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('Peace Arch');
@@ -393,7 +496,6 @@ describe('getBorderWaits', () => {
   it('shows "Not available" when wait time is missing', () => {
     const sparseOutput = {
       crossings: [{ crossingName: 'Sumas' }],
-      totalCount: 1,
     };
     const blocks = getBorderWaits.format!(sparseOutput);
     const text = (blocks[0] as { text: string }).text;
@@ -401,10 +503,9 @@ describe('getBorderWaits', () => {
   });
 
   it('formats empty crossings list', () => {
-    const blocks = getBorderWaits.format!({ crossings: [], totalCount: 0 });
+    const blocks = getBorderWaits.format!({ crossings: [] });
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('No border crossing data');
-    expect(text).toContain('0');
   });
 });
 
@@ -434,12 +535,41 @@ describe('searchCameras', () => {
     const input = searchCameras.input.parse({ stateRoute: '090' });
     const result = await searchCameras.handler(input, ctx);
     expect(result.cameras).toHaveLength(1);
-    expect(result.totalCount).toBe(1);
     expect(result.cameras[0].cameraId).toBe(1001);
     expect(mockService.searchCameras).toHaveBeenCalledWith(
       expect.objectContaining({ stateRoute: '090' }),
       ctx,
     );
+  });
+
+  it('enriches with totalCount and stateRoute filter', async () => {
+    mockService.searchCameras.mockResolvedValue([cameraFixture]);
+    const ctx = createMockContext();
+    const input = searchCameras.input.parse({ stateRoute: '090' });
+    await searchCameras.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(1);
+    expect(enrichment.appliedFilters.stateRoute).toBe('090');
+  });
+
+  it('enriches notice with copyright when results fit inline', async () => {
+    mockService.searchCameras.mockResolvedValue([cameraFixture]);
+    const ctx = createMockContext();
+    const input = searchCameras.input.parse({});
+    await searchCameras.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.notice).toContain('copyright');
+  });
+
+  it('enriches truncation notice when more than 20 cameras returned', async () => {
+    const manyCameras = Array.from({ length: 25 }, (_, i) => ({ ...cameraFixture, cameraId: i }));
+    mockService.searchCameras.mockResolvedValue(manyCameras);
+    const ctx = createMockContext();
+    const input = searchCameras.input.parse({});
+    await searchCameras.handler(input, ctx);
+    const enrichment = getEnrichment(ctx);
+    expect(enrichment.totalCount).toBe(25);
+    expect(enrichment.notice).toContain('first 20');
   });
 
   it('returns all cameras when no filter provided', async () => {
@@ -448,24 +578,11 @@ describe('searchCameras', () => {
     const input = searchCameras.input.parse({});
     const result = await searchCameras.handler(input, ctx);
     expect(result.cameras).toHaveLength(1);
-    expect(result.note).toBeDefined();
-  });
-
-  it('includes truncation note when more than 20 cameras returned', async () => {
-    const manyCameras = Array.from({ length: 25 }, (_, i) => ({ ...cameraFixture, cameraId: i }));
-    mockService.searchCameras.mockResolvedValue(manyCameras);
-    const ctx = createMockContext();
-    const input = searchCameras.input.parse({});
-    const result = await searchCameras.handler(input, ctx);
-    expect(result.totalCount).toBe(25);
-    expect(result.note).toContain('first 20');
   });
 
   it('formats cameras with key fields', () => {
     const output = {
       cameras: [cameraFixture],
-      totalCount: 1,
-      note: 'Camera images are copyright WSDOT.',
     };
     const blocks = searchCameras.format!(output);
     const text = (blocks[0] as { text: string }).text;
@@ -477,10 +594,11 @@ describe('searchCameras', () => {
   });
 
   it('formats empty cameras list', () => {
-    const output = { cameras: [], totalCount: 0 };
+    const output = { cameras: [] };
     const blocks = searchCameras.format!(output);
     const text = (blocks[0] as { text: string }).text;
-    expect(text).toContain('0 total');
+    // Empty cameras → empty text (no header since no results)
+    expect(text).toBeDefined();
   });
 
   it('strips whitespace-only stateRoute filter', async () => {

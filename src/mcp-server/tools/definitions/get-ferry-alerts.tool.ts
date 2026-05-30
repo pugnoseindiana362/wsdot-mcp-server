@@ -35,8 +35,15 @@ export const getFerryAlerts = tool('wsdot_get_ferry_alerts', {
           .describe('A WSF ferry service alert or disruption.'),
       )
       .describe('Active ferry service alerts and disruptions.'),
-    totalCount: z.number().describe('Total number of active alerts.'),
   }),
+
+  enrichment: {
+    totalCount: z.number().describe('Total number of active alerts.'),
+    notice: z
+      .string()
+      .optional()
+      .describe('Optional notice when no alerts are active. Absent when alerts are present.'),
+  },
 
   errors: [
     {
@@ -52,14 +59,20 @@ export const getFerryAlerts = tool('wsdot_get_ferry_alerts', {
   async handler(_input, ctx) {
     const alerts = await getFerryApiService().getAlerts(ctx);
     ctx.log.info('Ferry alerts fetched', { count: alerts.length });
-    return { alerts, totalCount: alerts.length };
+
+    ctx.enrich({ totalCount: alerts.length });
+    if (alerts.length === 0) {
+      ctx.enrich.notice('No active ferry service alerts at this time.');
+    }
+
+    return { alerts };
   },
 
   format: (result) => {
     if (result.alerts.length === 0) {
-      return [{ type: 'text', text: 'No active ferry alerts. **Total:** 0' }];
+      return [{ type: 'text', text: 'No active ferry alerts.' }];
     }
-    const lines: string[] = [`## Active Ferry Alerts (${result.totalCount})\n`];
+    const lines: string[] = [];
     for (const a of result.alerts) {
       const id = a.alertId != null ? ` #${a.alertId}` : '';
       lines.push(`### Alert${id}`);

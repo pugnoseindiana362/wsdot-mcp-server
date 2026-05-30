@@ -69,8 +69,21 @@ export const getTravelTimes = tool('wsdot_get_travel_times', {
           .describe('Travel time data for one highway corridor.'),
       )
       .describe('Travel time corridors matching the filter.'),
-    totalCount: z.number().describe('Total number of corridors returned.'),
   }),
+
+  enrichment: {
+    totalCount: z.number().describe('Total number of corridors returned.'),
+    routeFilter: z
+      .string()
+      .optional()
+      .describe('The route name filter applied (lowercased), or absent if no filter was used.'),
+    notice: z
+      .string()
+      .optional()
+      .describe(
+        'Optional guidance when no corridors matched the route filter. Absent when results are returned.',
+      ),
+  },
 
   errors: [
     {
@@ -99,14 +112,24 @@ export const getTravelTimes = tool('wsdot_get_travel_times', {
     }));
 
     ctx.log.info('Travel times fetched', { total: all.length, returned: corridors.length });
-    return { corridors, totalCount: corridors.length };
+
+    ctx.enrich({ totalCount: corridors.length, ...(routeFilter && { routeFilter }) });
+    if (corridors.length === 0) {
+      ctx.enrich.notice(
+        routeFilter
+          ? `No corridors matched the route filter "${routeFilter}". Try a broader filter (e.g. "I-5" instead of "I-5 NB") or omit the filter to list all corridors.`
+          : 'No travel time data available. The WSDOT API may be temporarily unavailable — retry in 30 seconds.',
+      );
+    }
+
+    return { corridors };
   },
 
   format: (result) => {
     if (result.corridors.length === 0) {
-      return [{ type: 'text', text: `No corridors matched. **Total:** 0` }];
+      return [{ type: 'text', text: 'No corridors matched.' }];
     }
-    const lines: string[] = [`## Travel Times (${result.totalCount} corridors)\n`];
+    const lines: string[] = [];
     for (const c of result.corridors) {
       lines.push(`### ${c.name ?? 'Corridor'}`);
       if (c.description) lines.push(c.description);

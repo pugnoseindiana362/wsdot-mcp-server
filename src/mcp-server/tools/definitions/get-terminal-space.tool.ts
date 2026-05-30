@@ -69,8 +69,21 @@ export const getTerminalSpace = tool('wsdot_get_terminal_space', {
           .describe('Space availability at one WSF terminal.'),
       )
       .describe('Terminal space availability by terminal.'),
-    totalCount: z.number().describe('Number of terminals returned.'),
   }),
+
+  enrichment: {
+    totalCount: z.number().describe('Number of terminals returned.'),
+    terminalFilter: z
+      .number()
+      .optional()
+      .describe('The terminal ID filter applied, or absent if no filter was used.'),
+    notice: z
+      .string()
+      .optional()
+      .describe(
+        'Optional guidance when no terminal space data is available or the filter matched nothing. Absent on normal results.',
+      ),
+  },
 
   errors: [
     {
@@ -91,14 +104,28 @@ export const getTerminalSpace = tool('wsdot_get_terminal_space', {
         : all;
 
     ctx.log.info('Terminal space fetched', { total: all.length, returned: filtered.length });
-    return { terminals: filtered, totalCount: filtered.length };
+
+    ctx.enrich({
+      totalCount: filtered.length,
+      ...(input.departingTerminalId != null && { terminalFilter: input.departingTerminalId }),
+    });
+
+    if (filtered.length === 0) {
+      ctx.enrich.notice(
+        input.departingTerminalId != null
+          ? `No terminal space data found for terminal ID ${input.departingTerminalId}. Use wsdot_get_ferry_terminals to verify valid terminal IDs.`
+          : 'No terminal space data available. The WSF API may be temporarily unavailable — retry in 30 seconds.',
+      );
+    }
+
+    return { terminals: filtered };
   },
 
   format: (result) => {
     if (result.terminals.length === 0) {
-      return [{ type: 'text', text: 'No terminal space data available. **Total:** 0' }];
+      return [{ type: 'text', text: 'No terminal space data available.' }];
     }
-    const lines: string[] = [`## Terminal Vehicle Space (${result.totalCount} terminals)\n`];
+    const lines: string[] = [];
     for (const t of result.terminals) {
       const tId = t.terminalId != null ? ` (ID: ${t.terminalId})` : '';
       lines.push(`### ${t.terminalName ?? 'Terminal'}${tId}`);

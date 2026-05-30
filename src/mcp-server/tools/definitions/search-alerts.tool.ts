@@ -77,8 +77,40 @@ export const searchAlerts = tool('wsdot_search_alerts', {
           .describe('A highway alert or incident.'),
       )
       .describe('Matching highway alerts.'),
-    totalCount: z.number().describe('Total number of alerts returned.'),
   }),
+
+  enrichment: {
+    totalCount: z.number().describe('Total number of alerts returned.'),
+    appliedFilters: z
+      .object({
+        stateRoute: z.string().optional().describe('State route filter applied.'),
+        region: z.string().optional().describe('Region filter applied.'),
+        startMilepost: z.number().optional().describe('Start milepost filter applied.'),
+        endMilepost: z.number().optional().describe('End milepost filter applied.'),
+      })
+      .describe('Active filters applied to the alert search.'),
+    notice: z
+      .string()
+      .optional()
+      .describe(
+        'Optional guidance when no alerts matched — suggests broadening or removing filters. Absent when results are returned.',
+      ),
+  },
+
+  enrichmentTrailer: {
+    appliedFilters: {
+      render: (filters) => {
+        const parts: string[] = [];
+        if (filters.stateRoute) parts.push(`- **Route:** SR ${filters.stateRoute}`);
+        if (filters.region) parts.push(`- **Region:** ${filters.region}`);
+        if (filters.startMilepost != null) parts.push(`- **Start MP:** ${filters.startMilepost}`);
+        if (filters.endMilepost != null) parts.push(`- **End MP:** ${filters.endMilepost}`);
+        return parts.length > 0
+          ? `**Applied Filters:**\n${parts.join('\n')}`
+          : '**Applied Filters:** none';
+      },
+    },
+  },
 
   errors: [
     {
@@ -104,14 +136,32 @@ export const searchAlerts = tool('wsdot_search_alerts', {
       ctx,
     );
     ctx.log.info('Alerts fetched', { count: alerts.length });
-    return { alerts, totalCount: alerts.length };
+
+    const appliedFilters = {
+      ...(stateRoute && { stateRoute }),
+      ...(region && { region }),
+      ...(input.startMilepost != null && { startMilepost: input.startMilepost }),
+      ...(input.endMilepost != null && { endMilepost: input.endMilepost }),
+    };
+
+    ctx.enrich({ totalCount: alerts.length, appliedFilters });
+    if (alerts.length === 0) {
+      const hasFilters = Object.keys(appliedFilters).length > 0;
+      ctx.enrich.notice(
+        hasFilters
+          ? 'No alerts matched the applied filters. Try removing the stateRoute, region, or milepost filters to broaden results.'
+          : 'No active highway alerts statewide at this time.',
+      );
+    }
+
+    return { alerts };
   },
 
   format: (result) => {
     if (result.alerts.length === 0) {
-      return [{ type: 'text', text: `No active alerts found. **Total:** 0` }];
+      return [{ type: 'text', text: 'No active alerts found.' }];
     }
-    const lines: string[] = [`## Highway Alerts (${result.totalCount})\n`];
+    const lines: string[] = [];
     for (const a of result.alerts) {
       const id = a.alertId != null ? ` #${a.alertId}` : '';
       lines.push(`### ${a.headlineDescription ?? 'Alert'}${id}`);

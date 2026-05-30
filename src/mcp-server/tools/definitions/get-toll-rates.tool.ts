@@ -38,8 +38,15 @@ export const getTollRates = tool('wsdot_get_toll_rates', {
           .describe('Current toll rate for one segment or trip.'),
       )
       .describe('Current toll rates for all active tolled facilities.'),
-    totalCount: z.number().describe('Total number of toll rate entries returned.'),
   }),
+
+  enrichment: {
+    totalCount: z.number().describe('Total number of toll rate entries returned.'),
+    notice: z
+      .string()
+      .optional()
+      .describe('Optional notice when no toll rate data is available. Absent on normal results.'),
+  },
 
   errors: [
     {
@@ -55,14 +62,22 @@ export const getTollRates = tool('wsdot_get_toll_rates', {
   async handler(_input, ctx) {
     const rates = await getTrafficApiService().getTollRates(ctx);
     ctx.log.info('Toll rates fetched', { count: rates.length });
-    return { rates, totalCount: rates.length };
+
+    ctx.enrich({ totalCount: rates.length });
+    if (rates.length === 0) {
+      ctx.enrich.notice(
+        'No toll rate data available. The WSDOT API may be temporarily unavailable — retry in 30 seconds.',
+      );
+    }
+
+    return { rates };
   },
 
   format: (result) => {
     if (result.rates.length === 0) {
-      return [{ type: 'text', text: 'No toll rate data available. **Total:** 0' }];
+      return [{ type: 'text', text: 'No toll rate data available.' }];
     }
-    const lines: string[] = [`## Toll Rates (${result.totalCount} entries)\n`];
+    const lines: string[] = [];
     for (const r of result.rates) {
       const name = r.tripName ?? r.signText ?? 'Toll segment';
       lines.push(`### ${name}`);

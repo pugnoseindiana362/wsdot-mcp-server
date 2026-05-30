@@ -55,12 +55,40 @@ export const searchCameras = tool('wsdot_search_cameras', {
           .describe('Camera metadata and image URL for one WSDOT highway camera.'),
       )
       .describe('Camera metadata and image URLs. Images are copyright WSDOT.'),
+  }),
+
+  enrichment: {
     totalCount: z.number().describe('Total number of cameras returned.'),
-    note: z
+    appliedFilters: z
+      .object({
+        stateRoute: z.string().optional().describe('State route filter applied.'),
+        region: z.string().optional().describe('Region filter applied.'),
+        startMilepost: z.number().optional().describe('Start milepost filter applied.'),
+        endMilepost: z.number().optional().describe('End milepost filter applied.'),
+      })
+      .describe('Active filters applied to the camera search.'),
+    notice: z
       .string()
       .optional()
-      .describe('Informational note about result truncation or copyright.'),
-  }),
+      .describe(
+        'Informational note about result truncation, copyright, or empty results. Absent when not applicable.',
+      ),
+  },
+
+  enrichmentTrailer: {
+    appliedFilters: {
+      render: (filters) => {
+        const parts: string[] = [];
+        if (filters.stateRoute) parts.push(`- **Route:** SR ${filters.stateRoute}`);
+        if (filters.region) parts.push(`- **Region:** ${filters.region}`);
+        if (filters.startMilepost != null) parts.push(`- **Start MP:** ${filters.startMilepost}`);
+        if (filters.endMilepost != null) parts.push(`- **End MP:** ${filters.endMilepost}`);
+        return parts.length > 0
+          ? `**Applied Filters:**\n${parts.join('\n')}`
+          : '**Applied Filters:** none';
+      },
+    },
+  },
 
   errors: [
     {
@@ -86,19 +114,37 @@ export const searchCameras = tool('wsdot_search_cameras', {
       ctx,
     );
 
-    const note =
-      cameras.length > MAX_INLINE_CAMERAS
-        ? `Showing first ${MAX_INLINE_CAMERAS} of ${cameras.length} cameras. Add filters (stateRoute, region, or mileposts) to narrow results. Camera images are copyright WSDOT.`
-        : 'Camera images are copyright WSDOT. Follow image URLs to view live feeds.';
+    const appliedFilters = {
+      ...(stateRoute && { stateRoute }),
+      ...(region && { region }),
+      ...(input.startMilepost != null && { startMilepost: input.startMilepost }),
+      ...(input.endMilepost != null && { endMilepost: input.endMilepost }),
+    };
 
     ctx.log.info('Cameras fetched', { count: cameras.length });
-    return { cameras, totalCount: cameras.length, note };
+
+    ctx.enrich({ totalCount: cameras.length, appliedFilters });
+
+    if (cameras.length === 0) {
+      const hasFilters = Object.keys(appliedFilters).length > 0;
+      ctx.enrich.notice(
+        hasFilters
+          ? 'No cameras matched the applied filters. Try removing the stateRoute, region, or milepost filters.'
+          : 'No camera data available statewide.',
+      );
+    } else if (cameras.length > MAX_INLINE_CAMERAS) {
+      ctx.enrich.notice(
+        `Showing first ${MAX_INLINE_CAMERAS} of ${cameras.length} cameras in content[]. All cameras are in structuredContent. Add filters (stateRoute, region, or mileposts) to narrow results. Camera images are copyright WSDOT.`,
+      );
+    } else {
+      ctx.enrich.notice('Camera images are copyright WSDOT. Follow image URLs to view live feeds.');
+    }
+
+    return { cameras };
   },
 
   format: (result) => {
     const lines: string[] = [];
-    if (result.note) lines.push(`> ${result.note}\n`);
-    lines.push(`## Highway Cameras (${result.totalCount} total)\n`);
     const display = result.cameras.slice(0, MAX_INLINE_CAMERAS);
     for (const c of display) {
       lines.push(`### ${c.title ?? `Camera ${c.cameraId ?? ''}`}`);

@@ -36,8 +36,6 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
   output: z.object({
     departingTerminalName: z.string().optional().describe('Departing terminal name.'),
     arrivingTerminalName: z.string().optional().describe('Arriving terminal name.'),
-    tripDate: z.string().describe('Date of the schedule (ISO 8601).'),
-    remainingOnly: z.boolean().describe('Whether the result shows only remaining sailings.'),
     sailings: z
       .array(
         z
@@ -50,8 +48,19 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
           .describe('One scheduled sailing with departure time and vessel assignment.'),
       )
       .describe('Scheduled sailings for this route and date.'),
-    totalSailings: z.number().describe('Total number of sailings returned.'),
   }),
+
+  enrichment: {
+    tripDate: z.string().describe('Date of the schedule (ISO 8601).'),
+    remainingOnly: z.boolean().describe('Whether the result shows only remaining sailings.'),
+    totalSailings: z.number().describe('Total number of sailings returned.'),
+    notice: z
+      .string()
+      .optional()
+      .describe(
+        'Optional notice when no sailings are found — e.g. invalid terminal pair or no service for this date. Absent when sailings are present.',
+      ),
+  },
 
   errors: [
     {
@@ -98,13 +107,19 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
       sailingsCount: schedule.sailings.length,
     });
 
+    ctx.enrich({ tripDate, remainingOnly, totalSailings: schedule.sailings.length });
+    if (schedule.sailings.length === 0) {
+      ctx.enrich.notice(
+        remainingOnly
+          ? `No remaining sailings today for this terminal pair (${tripDate}). The last sailing may have departed — check wsdot_get_ferry_schedule without remainingOnly for the full day's schedule.`
+          : `No sailings found for this terminal pair on ${tripDate}. Verify terminal IDs with wsdot_get_ferry_terminals and valid routes with wsdot_get_ferry_routes.`,
+      );
+    }
+
     return {
       departingTerminalName: schedule.departingTerminalName,
       arrivingTerminalName: schedule.arrivingTerminalName,
-      tripDate,
-      remainingOnly,
       sailings: schedule.sailings,
-      totalSailings: schedule.sailings.length,
     };
   },
 
@@ -113,11 +128,7 @@ export const getFerrySchedule = tool('wsdot_get_ferry_schedule', {
       result.departingTerminalName && result.arrivingTerminalName
         ? `${result.departingTerminalName} → ${result.arrivingTerminalName}`
         : 'Ferry Schedule';
-    const remainingNote = result.remainingOnly ? ' (remaining today)' : '';
-    const lines: string[] = [
-      `## Ferry Schedule — ${route}`,
-      `**Date:** ${result.tripDate}${remainingNote} | **Sailings:** ${result.totalSailings}`,
-    ];
+    const lines: string[] = [`## Ferry Schedule — ${route}`];
     if (result.departingTerminalName) lines.push(`**From:** ${result.departingTerminalName}`);
     if (result.arrivingTerminalName) lines.push(`**To:** ${result.arrivingTerminalName}`);
     lines.push('');

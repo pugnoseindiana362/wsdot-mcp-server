@@ -68,6 +68,16 @@ export const getMountainPasses = tool('wsdot_get_mountain_passes', {
       .describe('All WA mountain pass conditions.'),
   }),
 
+  enrichment: {
+    totalCount: z.number().describe('Total number of passes returned.'),
+    notice: z
+      .string()
+      .optional()
+      .describe(
+        'Optional notice when no pass data is available — e.g. API temporarily unavailable. Absent on normal results.',
+      ),
+  },
+
   errors: [
     {
       reason: 'api_unavailable',
@@ -82,6 +92,14 @@ export const getMountainPasses = tool('wsdot_get_mountain_passes', {
   async handler(_input, ctx) {
     const passes = await getTrafficApiService().getMountainPasses(ctx);
     ctx.log.info('Mountain passes fetched', { count: passes.length });
+
+    ctx.enrich({ totalCount: passes.length });
+    if (passes.length === 0) {
+      ctx.enrich.notice(
+        'No mountain pass data available. The WSDOT API may be temporarily unavailable — retry in 30 seconds.',
+      );
+    }
+
     return { passes };
   },
 
@@ -89,7 +107,7 @@ export const getMountainPasses = tool('wsdot_get_mountain_passes', {
     if (result.passes.length === 0) {
       return [{ type: 'text', text: 'No mountain pass data available.' }];
     }
-    const lines: string[] = [`## WA Mountain Pass Conditions (${result.passes.length} passes)\n`];
+    const lines: string[] = [];
     for (const p of result.passes) {
       lines.push(`### ${p.mountainPassName}`);
       if (p.elevation != null) lines.push(`**Elevation:** ${p.elevation} ft`);
